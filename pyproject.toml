@@ -7,6 +7,8 @@ authors = [
     { name = "Helton Dória", email = "helton.doria@gmail.com" }
 ]
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "pyagentspec>=25.4.1",
     "dapr-agents>=0.10.4",
