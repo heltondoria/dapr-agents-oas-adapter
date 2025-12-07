@@ -654,38 +654,6 @@ class TestMCPToolConverter:
         result = converter.from_oas(mock_tool)
         assert result.name == "mcp_search"
 
-    def test_from_oas_with_transport(self) -> None:
-        """Test MCPToolConverter.from_oas with transport config."""
-        # Only test if MCPTool is available
-        try:
-            from pyagentspec.tools import MCPTool
-        except ImportError:
-            pytest.skip("MCPTool not available")
-
-        converter = MCPToolConverter()
-
-        mock_transport = MagicMock()
-        mock_transport.url = "http://localhost:8080"
-        mock_transport.headers = {"Authorization": "Bearer token"}
-        mock_transport.session_parameters = {"timeout": 30}
-
-        mock_tool = MagicMock(spec=MCPTool)
-        mock_tool.id = "mcp_1"
-        mock_tool.name = "mcp_tool"
-        mock_tool.description = ""
-        mock_tool.inputs = []
-        mock_tool.outputs = []
-        mock_tool.client_transport = mock_transport
-
-        result = converter.from_oas(mock_tool)
-        # Check that transport config is added to inputs
-        transport_input = next(
-            (i for i in result.inputs if i.get("title") == "_mcp_transport"),
-            None
-        )
-        if transport_input:
-            assert transport_input["default"]["url"] == "http://localhost:8080"
-
     def test_extract_transport_config(self) -> None:
         """Test _extract_transport_config."""
         converter = MCPToolConverter()
@@ -710,7 +678,190 @@ class TestMCPToolConverter:
         del mock_transport.session_parameters
 
         result = converter._extract_transport_config(mock_transport)
-        assert result == {}
+        # Type is always extracted from class name, but no url/headers/session
+        assert "type" in result
+        assert "url" not in result
+        assert "headers" not in result
+        assert "session_parameters" not in result
+
+    def test_from_dict_mcp_tool_with_sse_transport(self) -> None:
+        """Test from_dict extracts SSE transport config from MCPTool."""
+        converter = ToolConverter()
+
+        tool_dict = {
+            "component_type": "MCPTool",
+            "id": "mcp_tool_1",
+            "name": "search_tool",
+            "description": "Search via MCP",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {
+                "component_type": "SSETransport",
+                "id": "transport_1",
+                "name": "MCP Client",
+                "url": "http://localhost:8080/sse",
+            },
+        }
+
+        result = converter.from_dict(tool_dict)
+        assert result.name == "search_tool"
+        assert result.mcp_transport is not None
+        assert result.mcp_transport["type"] == "SSETransport"
+        assert result.mcp_transport["url"] == "http://localhost:8080/sse"
+
+    def test_from_dict_mcp_tool_with_headers_and_session(self) -> None:
+        """Test from_dict extracts headers and session_parameters."""
+        converter = ToolConverter()
+
+        tool_dict = {
+            "component_type": "MCPTool",
+            "id": "mcp_tool_2",
+            "name": "secure_tool",
+            "description": "Secure MCP tool",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {
+                "component_type": "SSETransport",
+                "url": "https://mcp.example.com/sse",
+                "headers": {"Authorization": "Bearer token123"},
+                "session_parameters": {"timeout": 60, "retry": 3},
+            },
+        }
+
+        result = converter.from_dict(tool_dict)
+        assert result.mcp_transport is not None
+        assert result.mcp_transport["headers"] == {"Authorization": "Bearer token123"}
+        assert result.mcp_transport["session_parameters"] == {"timeout": 60, "retry": 3}
+
+    def test_to_dict_mcp_tool_preserves_transport(self) -> None:
+        """Test to_dict exports MCPTool with client_transport."""
+        converter = ToolConverter()
+
+        tool_def = ToolDefinition(
+            name="mcp_search",
+            description="Search via MCP server",
+            inputs=[{"title": "query", "type": "string"}],
+            outputs=[{"title": "results", "type": "array"}],
+            mcp_transport={
+                "type": "SSETransport",
+                "url": "http://localhost:8080/sse",
+                "headers": {"X-API-Key": "secret"},
+                "session_parameters": {"timeout": 30},
+            },
+        )
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "MCPTool"
+        assert result["name"] == "mcp_search"
+        assert "client_transport" in result
+        assert result["client_transport"]["component_type"] == "SSETransport"
+        assert result["client_transport"]["url"] == "http://localhost:8080/sse"
+        assert result["client_transport"]["headers"] == {"X-API-Key": "secret"}
+
+    def test_roundtrip_mcp_tool_conversion(self) -> None:
+        """Test roundtrip conversion preserves MCP transport config."""
+        converter = ToolConverter()
+
+        original_dict = {
+            "component_type": "MCPTool",
+            "id": "mcp_1",
+            "name": "roundtrip_tool",
+            "description": "Test roundtrip",
+            "inputs": [{"title": "input", "type": "string"}],
+            "outputs": [{"title": "output", "type": "string"}],
+            "client_transport": {
+                "component_type": "SSETransport",
+                "url": "http://mcp-server:8080/sse",
+                "headers": {"Auth": "Bearer xyz"},
+                "session_parameters": {"key": "value"},
+            },
+        }
+
+        # Convert dict -> ToolDefinition -> dict
+        tool_def = converter.from_dict(original_dict)
+        result_dict = converter.to_dict(tool_def)
+
+        # Verify roundtrip preserves key data
+        assert result_dict["component_type"] == "MCPTool"
+        assert result_dict["name"] == "roundtrip_tool"
+        assert result_dict["client_transport"]["url"] == "http://mcp-server:8080/sse"
+        assert result_dict["client_transport"]["headers"] == {"Auth": "Bearer xyz"}
+
+    def test_from_dict_mcp_tool_empty_transport_preserves_type(self) -> None:
+        """Test MCPTool with empty client_transport preserves component type."""
+        converter = ToolConverter()
+
+        # MCPTool with empty client_transport should still be treated as MCPTool
+        tool_dict = {
+            "component_type": "MCPTool",
+            "name": "empty_transport_tool",
+            "description": "MCP tool with empty transport",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {},
+        }
+
+        tool_def = converter.from_dict(tool_dict)
+        assert tool_def.mcp_transport is not None  # Should NOT be None
+
+        # Roundtrip should preserve MCPTool type
+        result_dict = converter.to_dict(tool_def)
+        assert result_dict["component_type"] == "MCPTool"
+
+    def test_to_dict_preserves_empty_headers_and_session(self) -> None:
+        """Test to_dict preserves explicitly empty headers and session_parameters."""
+        converter = ToolConverter()
+
+        tool_def = ToolDefinition(
+            name="empty_fields_tool",
+            description="Tool with empty headers/session",
+            inputs=[],
+            outputs=[],
+            mcp_transport={
+                "type": "SSETransport",
+                "url": "http://localhost:8080/sse",
+                "headers": {},  # Explicitly empty
+                "session_parameters": {},  # Explicitly empty
+            },
+        )
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "MCPTool"
+        # Empty dicts should be preserved, not omitted
+        assert result["client_transport"]["headers"] == {}
+        assert result["client_transport"]["session_parameters"] == {}
+
+    def test_from_dict_server_tool_no_mcp_transport(self) -> None:
+        """Test from_dict with ServerTool has no mcp_transport."""
+        converter = ToolConverter()
+
+        tool_dict = {
+            "component_type": "ServerTool",
+            "name": "server_tool",
+            "description": "A server tool",
+            "inputs": [],
+            "outputs": [],
+        }
+
+        result = converter.from_dict(tool_dict)
+        assert result.name == "server_tool"
+        assert result.mcp_transport is None
+
+    def test_to_dict_server_tool_no_transport(self) -> None:
+        """Test to_dict exports ServerTool when no mcp_transport."""
+        converter = ToolConverter()
+
+        tool_def = ToolDefinition(
+            name="simple_tool",
+            description="A simple server tool",
+            inputs=[],
+            outputs=[],
+            mcp_transport=None,
+        )
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "ServerTool"
+        assert "client_transport" not in result
 
 
 class TestAgentConverter:
@@ -1495,7 +1646,7 @@ class TestNodeConverter:
         """Test from_oas with LlmNode-like mock."""
         # Import the actual class for isinstance to work
         try:
-            from pyagentspec.flows import LlmNode as RealLlmNode
+            from pyagentspec.flows.nodes import LlmNode as RealLlmNode
         except ImportError:
             pytest.skip("LlmNode not available in pyagentspec")
 
@@ -1519,97 +1670,146 @@ class TestNodeConverter:
         assert result.task_type == "llm"
 
     def test_from_oas_tool_node(self) -> None:
-        """Test from_oas with ToolNode-like mock."""
+        """Test from_oas with ToolNode instance."""
         try:
-            from pyagentspec.flows import ToolNode as RealToolNode
+            from pyagentspec.flows.nodes import ToolNode as RealToolNode
+            from pyagentspec.tools import ServerTool
         except ImportError:
             pytest.skip("ToolNode not available in pyagentspec")
 
         converter = NodeConverter()
 
-        mock_node = MagicMock(spec=RealToolNode)
-        mock_node.id = "tool_1"
-        mock_node.name = "tool_node"
-        mock_node.inputs = []
-        mock_node.outputs = []
+        # Create a real ServerTool for the ToolNode
+        tool = ServerTool(
+            id="tool_1",
+            name="calculator",
+            description="A calculator tool",
+        )
 
-        mock_tool = MagicMock()
-        mock_tool.name = "calculator"
-        mock_tool.model_dump.return_value = {"name": "calculator"}
-        mock_node.tool = mock_tool
+        # Create a real ToolNode instance
+        node = RealToolNode(
+            id="tool_node_1",
+            name="tool_node",
+            tool=tool,
+        )
 
-        result = converter.from_oas(mock_node)
+        result = converter.from_oas(node)
         assert result.name == "tool_node"
         assert result.task_type == "tool"
 
     def test_from_oas_agent_node(self) -> None:
-        """Test from_oas with AgentNode-like mock."""
+        """Test from_oas with AgentNode instance."""
         try:
-            from pyagentspec.flows import AgentNode as RealAgentNode
+            from pyagentspec.agent import Agent
+            from pyagentspec.flows.nodes import AgentNode as RealAgentNode
+            from pyagentspec.llms import OpenAiConfig
         except ImportError:
             pytest.skip("AgentNode not available in pyagentspec")
 
         converter = NodeConverter()
 
-        mock_node = MagicMock(spec=RealAgentNode)
-        mock_node.id = "agent_1"
-        mock_node.name = "agent_node"
-        mock_node.inputs = []
-        mock_node.outputs = []
+        # Create a real Agent for the AgentNode
+        llm_config = OpenAiConfig(
+            name="openai_config",
+            model_id="gpt-4",
+        )
+        agent = Agent(
+            id="agent_1",
+            name="assistant",
+            llm_config=llm_config,
+            system_prompt="You are helpful",
+        )
 
-        mock_agent = MagicMock()
-        mock_agent.model_dump.return_value = {"name": "assistant"}
-        mock_node.agent = mock_agent
+        # Create a real AgentNode instance
+        node = RealAgentNode(
+            id="agent_node_1",
+            name="agent_node",
+            agent=agent,
+        )
 
-        result = converter.from_oas(mock_node)
+        result = converter.from_oas(node)
         assert result.name == "agent_node"
         assert result.task_type == "agent"
 
     def test_from_oas_flow_node(self) -> None:
-        """Test from_oas with FlowNode-like mock."""
+        """Test from_oas with FlowNode instance."""
         try:
-            from pyagentspec.flows import FlowNode as RealFlowNode
+            from pyagentspec.flows.edges import ControlFlowEdge
+            from pyagentspec.flows.flow import Flow
+            from pyagentspec.flows.nodes import EndNode, StartNode
+            from pyagentspec.flows.nodes import FlowNode as RealFlowNode
         except ImportError:
             pytest.skip("FlowNode not available in pyagentspec")
 
         converter = NodeConverter()
 
-        mock_node = MagicMock(spec=RealFlowNode)
-        mock_node.id = "flow_1"
-        mock_node.name = "flow_node"
-        mock_node.inputs = []
-        mock_node.outputs = []
+        # Create a complete Flow for the FlowNode (start → end with edge)
+        start_node = StartNode(id="start_1", name="start")
+        end_node = EndNode(id="end_1", name="end")
+        edge = ControlFlowEdge(
+            id="edge_1",
+            name="start_to_end",
+            from_node=start_node,
+            to_node=end_node,
+        )
+        sub_flow = Flow(
+            id="sub_flow_1",
+            name="sub_flow",
+            start_node=start_node,
+            nodes=[start_node, end_node],
+            control_flow_connections=[edge],
+            data_flow_connections=[],
+        )
 
-        mock_flow = MagicMock()
-        mock_flow.id = "sub_flow_123"
-        mock_flow.name = "sub_flow"
-        mock_node.flow = mock_flow
+        # Create a real FlowNode instance (uses 'subflow' not 'flow')
+        node = RealFlowNode(
+            id="flow_node_1",
+            name="flow_node",
+            subflow=sub_flow,
+        )
 
-        result = converter.from_oas(mock_node)
+        result = converter.from_oas(node)
         assert result.name == "flow_node"
         assert result.task_type == "flow"
 
     def test_from_oas_map_node(self) -> None:
-        """Test from_oas with MapNode-like mock."""
+        """Test from_oas with MapNode instance."""
         try:
-            from pyagentspec.flows import MapNode as RealMapNode
+            from pyagentspec.flows.edges import ControlFlowEdge
+            from pyagentspec.flows.flow import Flow
+            from pyagentspec.flows.nodes import EndNode, StartNode
+            from pyagentspec.flows.nodes import MapNode as RealMapNode
         except ImportError:
             pytest.skip("MapNode not available in pyagentspec")
 
         converter = NodeConverter()
 
-        mock_node = MagicMock(spec=RealMapNode)
-        mock_node.id = "map_1"
-        mock_node.name = "map_node"
-        mock_node.inputs = []
-        mock_node.outputs = []
-        mock_node.parallel = True
+        # Create a complete Flow for the MapNode's subflow (start → end with edge)
+        start_node = StartNode(id="inner_start", name="inner_start")
+        end_node = EndNode(id="inner_end", name="inner_end")
+        edge = ControlFlowEdge(
+            id="inner_edge",
+            name="start_to_end",
+            from_node=start_node,
+            to_node=end_node,
+        )
+        inner_flow = Flow(
+            id="inner_flow_1",
+            name="inner_flow",
+            start_node=start_node,
+            nodes=[start_node, end_node],
+            control_flow_connections=[edge],
+            data_flow_connections=[],
+        )
 
-        mock_inner_flow = MagicMock()
-        mock_inner_flow.id = "inner_123"
-        mock_node.inner_flow = mock_inner_flow
+        # Create a real MapNode instance (uses 'subflow' not 'inner_flow')
+        node = RealMapNode(
+            id="map_node_1",
+            name="map_node",
+            subflow=inner_flow,
+        )
 
-        result = converter.from_oas(mock_node)
+        result = converter.from_oas(node)
         assert result.name == "map_node"
         assert result.task_type == "map"
 

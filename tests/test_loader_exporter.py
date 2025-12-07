@@ -923,22 +923,30 @@ class TestLoaderEdgeCases:
     def test_load_component_with_flow(self) -> None:
         """Test load_component with OAS Flow."""
         try:
-            from pyagentspec.flows import flows
-
-            FlowClass = flows.Flow
+            from pyagentspec.flows.edges import ControlFlowEdge
+            from pyagentspec.flows.flow import Flow as FlowClass
+            from pyagentspec.flows.nodes import EndNode, StartNode
         except (ImportError, AttributeError):
             pytest.skip("Flow class not available in pyagentspec")
 
         loader = DaprAgentSpecLoader()
 
-        # Create a minimal OAS Flow
+        # Create a complete OAS Flow (start → end with edge)
+        start_node = StartNode(id="start_1", name="start")
+        end_node = EndNode(id="end_1", name="end")
+        edge = ControlFlowEdge(
+            id="edge_1",
+            name="start_to_end",
+            from_node=start_node,
+            to_node=end_node,
+        )
         flow = FlowClass(
             id="flow_1",
             name="test_flow",
-            nodes=[],
-            control_flow_connections=[],
+            nodes=[start_node, end_node],
+            control_flow_connections=[edge],
             data_flow_connections=[],
-            start_node=None,
+            start_node=start_node,
         )
 
         result = loader.load_component(flow)
