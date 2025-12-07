@@ -16,7 +16,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "codespell>=2.4.1",
     "mypy>=1.19.0",
+    "pyright>=1.1.407",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
@@ -34,7 +36,29 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort (imports)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "N",   # pep8-naming
+    "S",   # flake8-bandit (security)
+    "RUF", # regras do Ruff
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ['S101']
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
 
 [tool.mypy]
 python_version = "3.12"
@@ -42,7 +66,25 @@ strict = false
 ignore_missing_imports = true
 disable_error_code = ["import-untyped", "no-any-return", "attr-defined", "call-arg", "arg-type", "unused-ignore"]
 
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+reportMissingImports = "information"
+reportMissingTypeStubs = "none"
+include = ["."]
+exclude = ["**/.venv/**", "**/tests/**"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
+[tool.codespell]
+skip = ".git,.venv,uv.lock"
+check-filenames = true
+check-hidden = true
+ignore-words-list = "crate,fo,nd"
+
+[tool.vulture]
+paths = ["."]
+min_confidence = 90
+exclude = [".venv", "tests"]
