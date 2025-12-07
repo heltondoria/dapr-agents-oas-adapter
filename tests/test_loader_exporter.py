@@ -731,6 +731,7 @@ class TestDaprAgentSpecExporter:
 
         result = exporter.from_dapr_workflow(my_workflow, [task1, task2])
         assert result.name == "my_workflow"
+        assert result.description is not None
         assert "My test workflow" in result.description
         assert len(result.tasks) == 4  # start + 2 tasks + end
 

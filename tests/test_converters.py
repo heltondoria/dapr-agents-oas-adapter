@@ -2362,6 +2362,7 @@ class TestFlowConverter:
             end_nodes=[],
         )
         workflow_func = converter.create_dapr_workflow(workflow)
+        assert workflow_func.__doc__ is not None
         assert "no_desc" in workflow_func.__doc__
 
     def test_generate_workflow_code(self) -> None:
@@ -2520,7 +2521,7 @@ class TestFlowConverter:
             edges=[],
             end_nodes=["end"],
         )
-        results = {}  # No results from end node
+        results: dict[str, Any] = {}  # No results from end node
         output = converter._build_workflow_output(workflow, results)
         assert output == {"status": "completed", "output": None}
 
