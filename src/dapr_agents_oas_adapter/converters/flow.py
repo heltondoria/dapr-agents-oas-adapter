@@ -247,9 +247,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             if key not in data_mappings:
                 data_mappings[key] = {}
 
-            data_mappings[key][edge.get("source_output", "")] = edge.get(
-                "destination_input", ""
-            )
+            data_mappings[key][edge.get("source_output", "")] = edge.get("destination_input", "")
 
         # Merge data mappings into edges
         for edge in edges:
@@ -372,9 +370,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 results: dict[str, Any] = {"__input__": input_params}
 
                 for task_name in execution_order:
-                    task = next(
-                        (t for t in workflow_def.tasks if t.name == task_name), None
-                    )
+                    task = next((t for t in workflow_def.tasks if t.name == task_name), None)
                     if not task:
                         continue
 
@@ -525,9 +521,9 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             )
 
             if matching:
-                matching.data_mapping[
-                    getattr(data_edge, "source_output", "")
-                ] = getattr(data_edge, "destination_input", "")
+                matching.data_mapping[getattr(data_edge, "source_output", "")] = getattr(
+                    data_edge, "destination_input", ""
+                )
             else:
                 edges.append(
                     WorkflowEdgeDefinition(
@@ -646,4 +642,3 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             return {"status": "completed", "output": None}
 
         return output
-

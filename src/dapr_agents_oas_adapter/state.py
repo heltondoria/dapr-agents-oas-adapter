@@ -104,4 +104,3 @@ class StateSchemaBuilder:
             "schema": {k: v.__name__ for k, v in schema.items()},
             "defaults": defaults,
         }
-

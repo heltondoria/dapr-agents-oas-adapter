@@ -88,9 +88,7 @@ class DaprAgentSpecLoader:
         self._agent_converter.tool_registry = self._tool_registry
         self._flow_converter.tool_registry = self._tool_registry
 
-    def load_json(
-        self, json_content: str
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_json(self, json_content: str) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from JSON string.
 
         Args:
@@ -108,9 +106,7 @@ class DaprAgentSpecLoader:
         except Exception as e:
             raise ConversionError(f"Failed to load JSON: {e}") from e
 
-    def load_yaml(
-        self, yaml_content: str
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_yaml(self, yaml_content: str) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from YAML string.
 
         Args:
@@ -128,9 +124,7 @@ class DaprAgentSpecLoader:
         except Exception as e:
             raise ConversionError(f"Failed to load YAML: {e}") from e
 
-    def load_json_file(
-        self, file_path: str | Path
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_json_file(self, file_path: str | Path) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a JSON file.
 
         Args:
@@ -149,9 +143,7 @@ class DaprAgentSpecLoader:
         content = path.read_text(encoding="utf-8")
         return self.load_json(content)
 
-    def load_yaml_file(
-        self, file_path: str | Path
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_yaml_file(self, file_path: str | Path) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a YAML file.
 
         Args:
@@ -170,9 +162,7 @@ class DaprAgentSpecLoader:
         content = path.read_text(encoding="utf-8")
         return self.load_yaml(content)
 
-    def load_component(
-        self, component: Component
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_component(self, component: Component) -> DaprAgentConfig | WorkflowDefinition:
         """Load a PyAgentSpec Component and convert to Dapr format.
 
         Args:
@@ -194,9 +184,7 @@ class DaprAgentSpecLoader:
                 component,
             )
 
-    def load_dict(
-        self, spec_dict: dict[str, Any]
-    ) -> DaprAgentConfig | WorkflowDefinition:
+    def load_dict(self, spec_dict: dict[str, Any]) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a dictionary.
 
         Args:
@@ -257,9 +245,7 @@ class DaprAgentSpecLoader:
         Raises:
             ConversionError: If workflow creation fails
         """
-        return self._flow_converter.create_dapr_workflow(
-            workflow_def, task_implementations
-        )
+        return self._flow_converter.create_dapr_workflow(workflow_def, task_implementations)
 
     def generate_workflow_code(self, workflow_def: WorkflowDefinition) -> str:
         """Generate Python code for a Dapr workflow.
@@ -329,4 +315,3 @@ class DaprAgentSpecLoader:
             )
 
         return self.create_workflow(config, task_implementations)
-

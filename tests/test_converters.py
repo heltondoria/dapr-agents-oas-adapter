@@ -333,6 +333,7 @@ class TestToolConverter:
 
     def test_from_callable(self) -> None:
         """Test creating ToolDefinition from callable."""
+
         def search_web(query: str) -> list[str]:
             """Search the web for information."""
             return ["result1", "result2"]
@@ -348,6 +349,7 @@ class TestToolConverter:
 
     def test_from_callable_with_name_override(self) -> None:
         """Test from_callable with name override."""
+
         def my_func() -> str:
             """My function."""
             return "result"
@@ -358,6 +360,7 @@ class TestToolConverter:
 
     def test_from_callable_no_docstring(self) -> None:
         """Test from_callable without docstring."""
+
         def no_docs() -> str:
             return "result"
 
@@ -367,6 +370,7 @@ class TestToolConverter:
 
     def test_from_callable_with_default_params(self) -> None:
         """Test from_callable extracts default parameters."""
+
         def with_defaults(name: str, count: int = 10) -> str:
             """Function with defaults."""
             return f"{name}: {count}"
@@ -380,6 +384,7 @@ class TestToolConverter:
 
     def test_from_callable_return_type_none(self) -> None:
         """Test from_callable with None return type."""
+
         def void_func(x: str) -> None:
             """Void function."""
             pass
@@ -419,6 +424,7 @@ class TestToolConverter:
 
     def test_with_tool_registry(self) -> None:
         """Test tool converter with tool registry."""
+
         def my_tool() -> str:
             return "result"
 
@@ -446,6 +452,7 @@ class TestToolConverter:
 
     def test_from_oas_with_registry(self) -> None:
         """Test from_oas uses registry for implementation."""
+
         def search_impl(query: str) -> list[str]:
             return [query]
 
@@ -505,6 +512,7 @@ class TestToolConverter:
 
     def test_to_callable_with_implementation(self) -> None:
         """Test to_callable returns implementation."""
+
         def impl() -> str:
             return "result"
 
@@ -518,6 +526,7 @@ class TestToolConverter:
 
     def test_to_callable_from_registry(self) -> None:
         """Test to_callable looks up in registry."""
+
         def impl() -> str:
             return "result"
 
@@ -537,6 +546,7 @@ class TestToolConverter:
 
     def test_create_dapr_tool(self) -> None:
         """Test create_dapr_tool creates wrapped function."""
+
         def original(x: str) -> str:
             return f"Result: {x}"
 
@@ -558,6 +568,7 @@ class TestToolConverter:
 
     def test_create_dapr_tool_from_registry(self) -> None:
         """Test create_dapr_tool uses registry."""
+
         def impl() -> str:
             return "from registry"
 
@@ -948,9 +959,13 @@ class TestAgentConverter:
             tools=["search"],
         )
         # Add tool definitions as extra attribute
-        object.__setattr__(config, "tool_definitions", [
-            {"name": "search", "description": "Search tool"},
-        ])
+        object.__setattr__(
+            config,
+            "tool_definitions",
+            [
+                {"name": "search", "description": "Search tool"},
+            ],
+        )
 
         result = converter.to_dict(config)
         assert len(result["tools"]) == 1
@@ -1101,10 +1116,14 @@ class TestAgentConverter:
             tools=[],
         )
         # Add llm_config as extra attribute
-        object.__setattr__(config, "llm_config", {
-            "component_type": "OpenAIConfig",
-            "model_id": "gpt-4",
-        })
+        object.__setattr__(
+            config,
+            "llm_config",
+            {
+                "component_type": "OpenAIConfig",
+                "model_id": "gpt-4",
+            },
+        )
 
         result = converter.to_oas(config)
         assert result.llm_config is not None
@@ -1116,9 +1135,13 @@ class TestAgentConverter:
             name="tools_agent",
             tools=["search"],
         )
-        object.__setattr__(config, "tool_definitions", [
-            {"name": "search", "description": "Search"},
-        ])
+        object.__setattr__(
+            config,
+            "tool_definitions",
+            [
+                {"name": "search", "description": "Search"},
+            ],
+        )
 
         result = converter.to_oas(config)
         assert len(result.tools) == 1
@@ -1144,8 +1167,10 @@ class TestAgentConverter:
             with pytest.raises(ConversionError) as exc_info:
                 converter.create_dapr_agent(config)
             error_msg = str(exc_info.value)
-            assert "Failed to import Dapr Agents" in error_msg or \
-                   "Failed to create Dapr Agent" in error_msg
+            assert (
+                "Failed to import Dapr Agents" in error_msg
+                or "Failed to create Dapr Agent" in error_msg
+            )
 
     def test_create_dapr_agent_with_mock(self) -> None:
         """Test create_dapr_agent with mocked dapr_agents."""
@@ -1169,12 +1194,15 @@ class TestAgentConverter:
         mock_assistant = MagicMock()
         mock_tool_decorator = MagicMock(side_effect=lambda f: f)
 
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(return_value=mock_assistant),
-                tool=mock_tool_decorator,
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=mock_tool_decorator,
+                ),
+            },
+        ):
             result = converter.create_dapr_agent(config, {"search": search_func})
             assert result is mock_assistant
 
@@ -1191,13 +1219,16 @@ class TestAgentConverter:
 
         mock_react = MagicMock()
 
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(),
-                ReActAgent=MagicMock(return_value=mock_react),
-                tool=MagicMock(side_effect=lambda f: f),
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(),
+                    ReActAgent=MagicMock(return_value=mock_react),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
             result = converter.create_dapr_agent(config)
             assert result is mock_react
 
@@ -1410,6 +1441,7 @@ class TestAgentConverter:
 
     def test_with_tool_registry(self) -> None:
         """Test AgentConverter with tool registry."""
+
         def my_tool() -> str:
             return "result"
 
@@ -2122,6 +2154,7 @@ class TestNodeConverter:
 
     def test_with_tool_registry(self) -> None:
         """Test NodeConverter with tool registry."""
+
         def my_tool() -> str:
             return "result"
 
@@ -2460,6 +2493,7 @@ class TestFlowConverter:
         # Use isinstance check via duck typing
         try:
             from pyagentspec.flows import Flow
+
             mock_flow = MagicMock(spec=Flow)
             # Set required attributes
             mock_flow.__class__ = Flow
@@ -2956,6 +2990,7 @@ class TestConverterRegistry:
 
         # Use an actual LlmConfig instance via pyagentspec
         from pyagentspec.llms import VllmConfig
+
         config = VllmConfig(
             id="llm_1",
             name="test",
@@ -3215,4 +3250,3 @@ class TestExceptions:
         error = ValidationError("Invalid field", field="name")
         assert "Invalid field" in str(error)
         assert error.field == "name"
-

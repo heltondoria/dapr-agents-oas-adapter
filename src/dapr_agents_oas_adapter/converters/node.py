@@ -196,9 +196,7 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
 
         return result
 
-    def create_workflow_activity(
-        self, task_def: WorkflowTaskDefinition
-    ) -> dict[str, Any]:
+    def create_workflow_activity(self, task_def: WorkflowTaskDefinition) -> dict[str, Any]:
         """Create a Dapr workflow activity configuration from a task definition.
 
         Args:
@@ -329,4 +327,3 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
         elif hasattr(agent, "__dict__"):
             return dict(agent.__dict__)
         return {}
-

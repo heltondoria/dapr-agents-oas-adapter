@@ -23,6 +23,7 @@ class TestDaprAgentSpecLoader:
 
     def test_init_with_tool_registry(self) -> None:
         """Test initialization with tool registry."""
+
         def my_tool() -> str:
             return "result"
 
@@ -305,17 +306,21 @@ agentspec_version: "25.4.1"
         )
 
         mock_assistant = MagicMock()
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(return_value=mock_assistant),
-                tool=MagicMock(side_effect=lambda f: f),
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
             result = loader.create_agent(config)
             assert result is mock_assistant
 
     def test_create_agent_with_additional_tools(self) -> None:
         """Test create_agent with additional tools."""
+
         def extra_tool() -> str:
             return "extra"
 
@@ -326,12 +331,15 @@ agentspec_version: "25.4.1"
         )
 
         mock_assistant = MagicMock()
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(return_value=mock_assistant),
-                tool=MagicMock(side_effect=lambda f: f),
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
             result = loader.create_agent(config, additional_tools={"extra_tool": extra_tool})
             assert result is mock_assistant
 
@@ -407,12 +415,15 @@ agentspec_version: "25.4.1"
         }"""
 
         mock_assistant = MagicMock()
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(return_value=mock_assistant),
-                tool=MagicMock(side_effect=lambda f: f),
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
             result = loader.load_and_create_agent(json_content, is_yaml=False)
             assert result is mock_assistant
 
@@ -439,12 +450,15 @@ agentspec_version: "25.4.1"
 """
 
         mock_assistant = MagicMock()
-        with patch.dict("sys.modules", {
-            "dapr_agents": MagicMock(
-                AssistantAgent=MagicMock(return_value=mock_assistant),
-                tool=MagicMock(side_effect=lambda f: f),
-            ),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
             result = loader.load_and_create_agent(yaml_content, is_yaml=True)
             assert result is mock_assistant
 
@@ -581,8 +595,8 @@ agentspec_version: "25.4.1"
             end_nodes=["end"],
         )
 
-        with patch.object(loader, 'load_json', return_value=workflow_def):
-            result = loader.load_and_create_workflow('{}', is_yaml=False)
+        with patch.object(loader, "load_json", return_value=workflow_def):
+            result = loader.load_and_create_workflow("{}", is_yaml=False)
             assert callable(result)
 
     def test_load_and_create_workflow_with_yaml_flag(self) -> None:
@@ -603,8 +617,8 @@ agentspec_version: "25.4.1"
             end_nodes=["end"],
         )
 
-        with patch.object(loader, 'load_yaml', return_value=workflow_def):
-            result = loader.load_and_create_workflow('', is_yaml=True)
+        with patch.object(loader, "load_yaml", return_value=workflow_def):
+            result = loader.load_and_create_workflow("", is_yaml=True)
             assert callable(result)
 
     def test_load_and_create_workflow_with_agent_raises_error(self) -> None:
@@ -618,9 +632,9 @@ agentspec_version: "25.4.1"
             goal="Assist",
         )
 
-        with patch.object(loader, 'load_json', return_value=agent_config):
+        with patch.object(loader, "load_json", return_value=agent_config):
             with pytest.raises(ConversionError) as exc_info:
-                loader.load_and_create_workflow('{}', is_yaml=False)
+                loader.load_and_create_workflow("{}", is_yaml=False)
             assert "Expected Flow specification" in str(exc_info.value)
 
     def test_generate_workflow_code(self) -> None:
@@ -892,6 +906,7 @@ class TestDaprAgentSpecExporter:
     def test_export_workflow_to_dict_then_json(self) -> None:
         """Test exporting workflow to dict and then JSON manually."""
         import json
+
         exporter = DaprAgentSpecExporter()
 
         workflow = WorkflowDefinition(
@@ -919,6 +934,7 @@ class TestDaprAgentSpecExporter:
     def test_export_workflow_to_dict_then_yaml(self) -> None:
         """Test exporting workflow to dict and then YAML manually."""
         import yaml
+
         exporter = DaprAgentSpecExporter()
 
         workflow = WorkflowDefinition(
@@ -998,9 +1014,10 @@ class TestDaprAgentSpecExporter:
         # Mock from_dapr_workflow and to_json to test the convenience method
         json_return = '{"component_type": "Flow", "name": "json_export_workflow"}'
         with (
-            patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def),
-            patch.object(exporter, 'to_json', return_value=json_return),
+            patch.object(exporter, "from_dapr_workflow", return_value=workflow_def),
+            patch.object(exporter, "to_json", return_value=json_return),
         ):
+
             def my_workflow(ctx: Any, params: dict) -> dict:
                 """Test workflow."""
                 return {}
@@ -1027,11 +1044,12 @@ class TestDaprAgentSpecExporter:
         )
 
         # Mock from_dapr_workflow and to_yaml to test the convenience method
-        yaml_return = 'component_type: Flow\nname: yaml_export_workflow'
+        yaml_return = "component_type: Flow\nname: yaml_export_workflow"
         with (
-            patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def),
-            patch.object(exporter, 'to_yaml', return_value=yaml_return),
+            patch.object(exporter, "from_dapr_workflow", return_value=workflow_def),
+            patch.object(exporter, "to_yaml", return_value=yaml_return),
         ):
+
             def my_workflow(ctx: Any, params: dict) -> dict:
                 """Test workflow."""
                 return {}
@@ -1167,4 +1185,3 @@ class TestLoaderExporterIntegration:
         assert isinstance(loaded, WorkflowDefinition)
         assert loaded.name == original.name
         assert loaded.description == original.description
-

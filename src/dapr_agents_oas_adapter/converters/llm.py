@@ -231,4 +231,3 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
             result["default_generation_parameters"] = gen_params
 
         return result
-

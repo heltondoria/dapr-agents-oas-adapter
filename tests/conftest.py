@@ -12,6 +12,7 @@ from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 @pytest.fixture
 def sample_tool_registry() -> dict[str, Callable[..., Any]]:
     """Provide a sample tool registry for testing."""
+
     def search_tool(query: str) -> list[str]:
         """Search the web."""
         return [f"Result for: {query}"]

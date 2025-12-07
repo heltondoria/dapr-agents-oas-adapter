@@ -86,9 +86,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             tools=[t.name for t in tools],
             message_bus_name=metadata.get("message_bus_name", "messagepubsub"),
             state_store_name=metadata.get("state_store_name", "statestore"),
-            agents_registry_store_name=metadata.get(
-                "agents_registry_store_name", "agentsregistry"
-            ),
+            agents_registry_store_name=metadata.get("agents_registry_store_name", "agentsregistry"),
             service_port=metadata.get("service_port", 8000),
             # Store additional config via model_config extra="allow"
             agent_type=agent_type.value,
@@ -189,12 +187,14 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     self._tool_converter.to_dict(self._tool_converter.from_dict(t))
                 )
             else:
-                tool_definitions.append({
-                    "name": str(t),
-                    "description": "",
-                    "inputs": [],
-                    "outputs": [],
-                })
+                tool_definitions.append(
+                    {
+                        "name": str(t),
+                        "description": "",
+                        "inputs": [],
+                        "outputs": [],
+                    }
+                )
 
         # Extract system prompt
         system_prompt = agent_dict.get("system_prompt", "")
@@ -314,8 +314,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
 
         except ImportError as e:
             raise ConversionError(
-                f"Failed to import Dapr Agents: {e}. "
-                "Make sure dapr-agents is installed.",
+                f"Failed to import Dapr Agents: {e}. Make sure dapr-agents is installed.",
                 config,
             ) from e
         except Exception as e:
@@ -422,10 +421,11 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         input_vars = getattr(config, "input_variables", [])
 
         for var in input_vars:
-            inputs.append({
-                "title": var,
-                "type": "string",
-            })
+            inputs.append(
+                {
+                    "title": var,
+                    "type": "string",
+                }
+            )
 
         return inputs
-

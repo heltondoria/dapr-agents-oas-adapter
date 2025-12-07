@@ -308,9 +308,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
 
         return [{"title": "result", "type": json_type}]
 
-    def _build_annotations_from_schema(
-        self, inputs: list[PropertySchema]
-    ) -> dict[str, type]:
+    def _build_annotations_from_schema(self, inputs: list[PropertySchema]) -> dict[str, type]:
         """Build Python annotations from JSON Schema properties."""
         from dapr_agents_oas_adapter.utils import json_schema_to_python_type
 
@@ -374,4 +372,3 @@ class MCPToolConverter(ToolConverter):
             config["session_parameters"] = transport.session_parameters
 
         return config
-

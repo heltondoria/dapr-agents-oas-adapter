@@ -208,4 +208,3 @@ class ConverterRegistry:
             )
         result: Component = converter.to_oas(component)
         return result
-

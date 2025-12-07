@@ -179,4 +179,3 @@ PYTHON_TO_JSON_SCHEMA: dict[type, str] = {
     dict: "object",
     type(None): "null",
 }
-

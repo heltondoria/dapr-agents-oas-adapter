@@ -74,9 +74,7 @@ class DaprAgentSpecExporter:
             return json.dumps(json.loads(base_json), indent=indent, ensure_ascii=False)
         return base_json
 
-    def to_yaml(
-        self, component: DaprAgentConfig | WorkflowDefinition
-    ) -> str:
+    def to_yaml(self, component: DaprAgentConfig | WorkflowDefinition) -> str:
         """Export a Dapr component to OAS YAML format.
 
         Args:
@@ -91,9 +89,7 @@ class DaprAgentSpecExporter:
         oas_component = self.to_component(component)
         return self._serializer.to_yaml(oas_component)
 
-    def to_dict(
-        self, component: DaprAgentConfig | WorkflowDefinition
-    ) -> dict[str, Any]:
+    def to_dict(self, component: DaprAgentConfig | WorkflowDefinition) -> dict[str, Any]:
         """Export a Dapr component to OAS dictionary format.
 
         Args:
@@ -118,9 +114,7 @@ class DaprAgentSpecExporter:
         result["agentspec_version"] = self.AGENTSPEC_VERSION
         return result
 
-    def to_component(
-        self, component: DaprAgentConfig | WorkflowDefinition
-    ) -> Component:
+    def to_component(self, component: DaprAgentConfig | WorkflowDefinition) -> Component:
         """Convert a Dapr component to an OAS Component object.
 
         Args:
@@ -199,10 +193,7 @@ class DaprAgentSpecExporter:
 
             # Extract tools
             tools = getattr(agent, "tools", [])
-            tool_names = [
-                getattr(t, "__name__", str(t)) if callable(t) else str(t)
-                for t in tools
-            ]
+            tool_names = [getattr(t, "__name__", str(t)) if callable(t) else str(t) for t in tools]
 
             # Extract tool definitions
             tool_definitions = []
@@ -323,8 +314,11 @@ class DaprAgentSpecExporter:
                         from_node=tasks[i].name,
                         to_node=tasks[i + 1].name,
                         data_mapping={
-                            tasks[i].outputs[0] if tasks[i].outputs else "result":
-                            tasks[i + 1].inputs[0] if tasks[i + 1].inputs else "input"
+                            tasks[i].outputs[0] if tasks[i].outputs else "result": tasks[
+                                i + 1
+                            ].inputs[0]
+                            if tasks[i + 1].inputs
+                            else "input"
                         },
                     )
                 )
@@ -448,4 +442,3 @@ class DaprAgentSpecExporter:
                 inputs.append(param_name)
 
         return inputs if inputs else ["input"]
-

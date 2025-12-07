@@ -98,6 +98,7 @@ class TestToolDefinition:
 
     def test_tool_with_implementation(self) -> None:
         """Test tool definition with implementation."""
+
         def search_func(query: str) -> list[str]:
             return [query]
 
@@ -222,4 +223,3 @@ class TestMappings:
         assert JSON_SCHEMA_TO_PYTHON["boolean"] is bool
         assert PYTHON_TO_JSON_SCHEMA[str] == "string"
         assert PYTHON_TO_JSON_SCHEMA[int] == "integer"
-

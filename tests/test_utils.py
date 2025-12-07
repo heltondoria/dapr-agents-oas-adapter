@@ -126,9 +126,7 @@ class TestTemplateVariables:
     def test_render_template_multiple_vars(self) -> None:
         """Test rendering template with multiple variables."""
         template = "{{ greeting }} {{ name }}, age {{ age }}."
-        result = render_template(
-            template, {"greeting": "Hi", "name": "Alice", "age": "30"}
-        )
+        result = render_template(template, {"greeting": "Hi", "name": "Alice", "age": "30"})
         assert result == "Hi Alice, age 30."
 
 
@@ -187,4 +185,3 @@ class TestNestedValues:
         data = {"a": {"b": {"c": 1}}}
         set_nested_value(data, "a.b.d", 2)
         assert data == {"a": {"b": {"c": 1, "d": 2}}}
-

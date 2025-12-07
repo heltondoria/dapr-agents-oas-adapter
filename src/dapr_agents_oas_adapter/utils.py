@@ -151,4 +151,3 @@ def set_nested_value(data: dict[str, Any], path: str, value: Any) -> None:
             current[key] = {}
         current = current[key]
     current[keys[-1]] = value
-

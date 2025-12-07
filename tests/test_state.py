@@ -1,7 +1,5 @@
 """Tests for StateSchemaBuilder module."""
 
-
-
 from dapr_agents_oas_adapter.state import StateSchemaBuilder
 from dapr_agents_oas_adapter.types import PropertySchema
 
@@ -233,9 +231,7 @@ class TestStateSchemaBuilder:
         properties: list[PropertySchema] = [
             {"title": "value", "type": "number"},
         ]
-        result = StateSchemaBuilder.to_dapr_state_config(
-            properties, store_name="custom_store"
-        )
+        result = StateSchemaBuilder.to_dapr_state_config(properties, store_name="custom_store")
         assert result["store_name"] == "custom_store"
         assert result["schema"] == {"value": "float"}
 
