@@ -1,18 +1,14 @@
 """Base converter class for OAS <-> Dapr Agents conversion."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pyagentspec import Component
 
 from dapr_agents_oas_adapter.types import ToolRegistry
 
-# Type variables for generic converter
-OASType = TypeVar("OASType", bound=Component)
-DaprType = TypeVar("DaprType")
 
-
-class ComponentConverter(ABC, Generic[OASType, DaprType]):
+class ComponentConverter[OASType: Component, DaprType](ABC):
     """Abstract base class for component converters.
 
     This class defines the interface for bidirectional conversion between

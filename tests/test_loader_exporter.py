@@ -996,15 +996,18 @@ class TestDaprAgentSpecExporter:
         )
 
         # Mock from_dapr_workflow and to_json to test the convenience method
-        with patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def):
-            with patch.object(exporter, 'to_json', return_value='{"component_type": "Flow", "name": "json_export_workflow"}'):
-                def my_workflow(ctx: Any, params: dict) -> dict:
-                    """Test workflow."""
-                    return {}
+        json_return = '{"component_type": "Flow", "name": "json_export_workflow"}'
+        with (
+            patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def),
+            patch.object(exporter, 'to_json', return_value=json_return),
+        ):
+            def my_workflow(ctx: Any, params: dict) -> dict:
+                """Test workflow."""
+                return {}
 
-                result = exporter.export_workflow_to_json(my_workflow, [])
-                assert "json_export_workflow" in result
-                assert '"component_type": "Flow"' in result
+            result = exporter.export_workflow_to_json(my_workflow, [])
+            assert "json_export_workflow" in result
+            assert '"component_type": "Flow"' in result
 
     def test_export_workflow_to_yaml(self) -> None:
         """Test convenience method for workflow YAML export."""
@@ -1024,15 +1027,18 @@ class TestDaprAgentSpecExporter:
         )
 
         # Mock from_dapr_workflow and to_yaml to test the convenience method
-        with patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def):
-            with patch.object(exporter, 'to_yaml', return_value='component_type: Flow\nname: yaml_export_workflow'):
-                def my_workflow(ctx: Any, params: dict) -> dict:
-                    """Test workflow."""
-                    return {}
+        yaml_return = 'component_type: Flow\nname: yaml_export_workflow'
+        with (
+            patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def),
+            patch.object(exporter, 'to_yaml', return_value=yaml_return),
+        ):
+            def my_workflow(ctx: Any, params: dict) -> dict:
+                """Test workflow."""
+                return {}
 
-                result = exporter.export_workflow_to_yaml(my_workflow, [])
-                assert "yaml_export_workflow" in result
-                assert "component_type: Flow" in result
+            result = exporter.export_workflow_to_yaml(my_workflow, [])
+            assert "yaml_export_workflow" in result
+            assert "component_type: Flow" in result
 
 
 class TestLoaderEdgeCases:

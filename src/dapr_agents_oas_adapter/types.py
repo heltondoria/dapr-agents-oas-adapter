@@ -1,14 +1,15 @@
 """Type definitions and mappings for OAS <-> Dapr Agents conversion."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, TypeAlias
+from typing import Any
 
 from pydantic import BaseModel
 
 # Type aliases for clarity
-ToolRegistry: TypeAlias = dict[str, Callable[..., Any]]
-PropertySchema: TypeAlias = dict[str, Any]
+type ToolRegistry = dict[str, Callable[..., Any]]
+type PropertySchema = dict[str, Any]
 
 
 class OASComponentType(str, Enum):

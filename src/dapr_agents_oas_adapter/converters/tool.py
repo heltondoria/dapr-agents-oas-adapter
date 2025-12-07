@@ -1,7 +1,8 @@
 """Tool converter for OAS <-> Dapr Agents."""
 
 import inspect
-from typing import Any, Callable, get_type_hints
+from collections.abc import Callable
+from typing import Any, get_type_hints
 
 from pyagentspec.tools import RemoteTool, ServerTool, Tool
 

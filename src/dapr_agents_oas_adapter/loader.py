@@ -1,7 +1,8 @@
 """Loader for converting OAS specifications to Dapr Agents components."""
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 from pyagentspec import Component
 from pyagentspec.agent import Agent as OASAgent
@@ -89,7 +90,7 @@ class DaprAgentSpecLoader:
 
     def load_json(
         self, json_content: str
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from JSON string.
 
         Args:
@@ -109,7 +110,7 @@ class DaprAgentSpecLoader:
 
     def load_yaml(
         self, yaml_content: str
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from YAML string.
 
         Args:
@@ -129,7 +130,7 @@ class DaprAgentSpecLoader:
 
     def load_json_file(
         self, file_path: str | Path
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a JSON file.
 
         Args:
@@ -150,7 +151,7 @@ class DaprAgentSpecLoader:
 
     def load_yaml_file(
         self, file_path: str | Path
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a YAML file.
 
         Args:
@@ -171,7 +172,7 @@ class DaprAgentSpecLoader:
 
     def load_component(
         self, component: Component
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load a PyAgentSpec Component and convert to Dapr format.
 
         Args:
@@ -195,7 +196,7 @@ class DaprAgentSpecLoader:
 
     def load_dict(
         self, spec_dict: dict[str, Any]
-    ) -> Union[DaprAgentConfig, WorkflowDefinition]:
+    ) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a dictionary.
 
         Args:
@@ -290,10 +291,7 @@ class DaprAgentSpecLoader:
         Raises:
             ConversionError: If loading or creation fails
         """
-        if is_yaml:
-            config = self.load_yaml(json_or_yaml)
-        else:
-            config = self.load_json(json_or_yaml)
+        config = self.load_yaml(json_or_yaml) if is_yaml else self.load_json(json_or_yaml)
 
         if not isinstance(config, DaprAgentConfig):
             raise ConversionError(
@@ -322,10 +320,7 @@ class DaprAgentSpecLoader:
         Raises:
             ConversionError: If loading or creation fails
         """
-        if is_yaml:
-            config = self.load_yaml(json_or_yaml)
-        else:
-            config = self.load_json(json_or_yaml)
+        config = self.load_yaml(json_or_yaml) if is_yaml else self.load_json(json_or_yaml)
 
         if not isinstance(config, WorkflowDefinition):
             raise ConversionError(

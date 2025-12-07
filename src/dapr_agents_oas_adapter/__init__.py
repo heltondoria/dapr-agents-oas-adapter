@@ -11,6 +11,6 @@ from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 
 __version__ = "0.1.0"
 __all__ = [
-    "DaprAgentSpecLoader",
     "DaprAgentSpecExporter",
+    "DaprAgentSpecLoader",
 ]

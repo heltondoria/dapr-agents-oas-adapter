@@ -1,6 +1,6 @@
 """LLM configuration converter for OAS <-> Dapr Agents."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from pyagentspec.llms import LlmConfig, OllamaConfig, OpenAiConfig, VllmConfig
 
@@ -25,7 +25,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
     """
 
     # Mapping of OAS LLM config types to their classes
-    OAS_LLM_TYPES: dict[str, type[LlmConfig]] = {
+    OAS_LLM_TYPES: ClassVar[dict[str, type[LlmConfig]]] = {
         "VllmConfig": VllmConfig,
         "OpenAIConfig": OpenAiConfig,
         "OllamaConfig": OllamaConfig,

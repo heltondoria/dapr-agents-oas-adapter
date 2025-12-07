@@ -2,8 +2,9 @@
 
 import inspect
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 from pyagentspec import Component
 from pyagentspec.serialization import AgentSpecSerializer
@@ -50,7 +51,7 @@ class DaprAgentSpecExporter:
 
     def to_json(
         self,
-        component: Union[DaprAgentConfig, WorkflowDefinition],
+        component: DaprAgentConfig | WorkflowDefinition,
         indent: int = 2,
     ) -> str:
         """Export a Dapr component to OAS JSON format.
@@ -74,7 +75,7 @@ class DaprAgentSpecExporter:
         return base_json
 
     def to_yaml(
-        self, component: Union[DaprAgentConfig, WorkflowDefinition]
+        self, component: DaprAgentConfig | WorkflowDefinition
     ) -> str:
         """Export a Dapr component to OAS YAML format.
 
@@ -91,7 +92,7 @@ class DaprAgentSpecExporter:
         return self._serializer.to_yaml(oas_component)
 
     def to_dict(
-        self, component: Union[DaprAgentConfig, WorkflowDefinition]
+        self, component: DaprAgentConfig | WorkflowDefinition
     ) -> dict[str, Any]:
         """Export a Dapr component to OAS dictionary format.
 
@@ -118,7 +119,7 @@ class DaprAgentSpecExporter:
         return result
 
     def to_component(
-        self, component: Union[DaprAgentConfig, WorkflowDefinition]
+        self, component: DaprAgentConfig | WorkflowDefinition
     ) -> Component:
         """Convert a Dapr component to an OAS Component object.
 
@@ -143,7 +144,7 @@ class DaprAgentSpecExporter:
 
     def to_json_file(
         self,
-        component: Union[DaprAgentConfig, WorkflowDefinition],
+        component: DaprAgentConfig | WorkflowDefinition,
         file_path: str | Path,
         indent: int = 2,
     ) -> None:
@@ -162,7 +163,7 @@ class DaprAgentSpecExporter:
 
     def to_yaml_file(
         self,
-        component: Union[DaprAgentConfig, WorkflowDefinition],
+        component: DaprAgentConfig | WorkflowDefinition,
         file_path: str | Path,
     ) -> None:
         """Export a Dapr component to an OAS YAML file.
@@ -442,7 +443,7 @@ class DaprAgentSpecExporter:
         sig = inspect.signature(func)
         inputs: list[str] = []
 
-        for param_name, param in sig.parameters.items():
+        for param_name, _param in sig.parameters.items():
             if param_name not in ("self", "cls", "ctx", "context"):
                 inputs.append(param_name)
 

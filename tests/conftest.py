@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -17,7 +18,7 @@ def sample_tool_registry() -> dict[str, Callable[..., Any]]:
 
     def calculator_tool(expression: str) -> float:
         """Calculate an expression."""
-        return eval(expression)
+        return eval(expression)  # noqa: S307
 
     return {
         "search": search_tool,

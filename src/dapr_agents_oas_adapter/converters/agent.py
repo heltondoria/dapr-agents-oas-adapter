@@ -1,6 +1,7 @@
 """Agent converter for OAS <-> Dapr Agents."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from pyagentspec.agent import Agent as OASAgent
 

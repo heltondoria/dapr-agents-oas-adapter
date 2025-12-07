@@ -1,6 +1,7 @@
 """Flow converter for OAS <-> Dapr Agents workflows."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from pyagentspec import Component
 
