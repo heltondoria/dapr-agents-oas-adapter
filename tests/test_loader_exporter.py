@@ -561,6 +561,68 @@ agentspec_version: "25.4.1"
             # This should fail because result is DaprAgentConfig, not WorkflowDefinition
             loader.create_workflow(result)  # type: ignore
 
+    def test_load_and_create_workflow_convenience_method(self) -> None:
+        """Test load_and_create_workflow convenience method."""
+        loader = DaprAgentSpecLoader()
+
+        # Use load_dict to create a workflow, then verify the method works
+        # by mocking load_json to return a WorkflowDefinition
+        workflow_def = WorkflowDefinition(
+            name="convenience_workflow",
+            description="Convenience test",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start"),
+                WorkflowTaskDefinition(name="end", task_type="end"),
+            ],
+            edges=[
+                WorkflowEdgeDefinition(from_node="start", to_node="end"),
+            ],
+            start_node="start",
+            end_nodes=["end"],
+        )
+
+        with patch.object(loader, 'load_json', return_value=workflow_def):
+            result = loader.load_and_create_workflow('{}', is_yaml=False)
+            assert callable(result)
+
+    def test_load_and_create_workflow_with_yaml_flag(self) -> None:
+        """Test load_and_create_workflow with is_yaml=True."""
+        loader = DaprAgentSpecLoader()
+
+        workflow_def = WorkflowDefinition(
+            name="yaml_workflow",
+            description="YAML test",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start"),
+                WorkflowTaskDefinition(name="end", task_type="end"),
+            ],
+            edges=[
+                WorkflowEdgeDefinition(from_node="start", to_node="end"),
+            ],
+            start_node="start",
+            end_nodes=["end"],
+        )
+
+        with patch.object(loader, 'load_yaml', return_value=workflow_def):
+            result = loader.load_and_create_workflow('', is_yaml=True)
+            assert callable(result)
+
+    def test_load_and_create_workflow_with_agent_raises_error(self) -> None:
+        """Test load_and_create_workflow raises ConversionError for Agent."""
+        loader = DaprAgentSpecLoader()
+
+        # Mock load_json to return an agent config instead of workflow
+        agent_config = DaprAgentConfig(
+            name="test_agent",
+            role="Helper",
+            goal="Assist",
+        )
+
+        with patch.object(loader, 'load_json', return_value=agent_config):
+            with pytest.raises(ConversionError) as exc_info:
+                loader.load_and_create_workflow('{}', is_yaml=False)
+            assert "Expected Flow specification" in str(exc_info.value)
+
     def test_generate_workflow_code(self) -> None:
         """Test workflow code generation."""
         loader = DaprAgentSpecLoader()
@@ -915,6 +977,62 @@ class TestDaprAgentSpecExporter:
         with pytest.raises(ConversionError) as exc_info:
             exporter.to_dict("unsupported")
         assert "Unsupported component type" in str(exc_info.value)
+
+    def test_export_workflow_to_json(self) -> None:
+        """Test convenience method for workflow JSON export."""
+        exporter = DaprAgentSpecExporter()
+
+        # Create a workflow definition
+        workflow_def = WorkflowDefinition(
+            name="json_export_workflow",
+            description="JSON export test",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start"),
+                WorkflowTaskDefinition(name="end", task_type="end"),
+            ],
+            edges=[WorkflowEdgeDefinition(from_node="start", to_node="end")],
+            start_node="start",
+            end_nodes=["end"],
+        )
+
+        # Mock from_dapr_workflow and to_json to test the convenience method
+        with patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def):
+            with patch.object(exporter, 'to_json', return_value='{"component_type": "Flow", "name": "json_export_workflow"}'):
+                def my_workflow(ctx: Any, params: dict) -> dict:
+                    """Test workflow."""
+                    return {}
+
+                result = exporter.export_workflow_to_json(my_workflow, [])
+                assert "json_export_workflow" in result
+                assert '"component_type": "Flow"' in result
+
+    def test_export_workflow_to_yaml(self) -> None:
+        """Test convenience method for workflow YAML export."""
+        exporter = DaprAgentSpecExporter()
+
+        # Create a workflow definition
+        workflow_def = WorkflowDefinition(
+            name="yaml_export_workflow",
+            description="YAML export test",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start"),
+                WorkflowTaskDefinition(name="end", task_type="end"),
+            ],
+            edges=[WorkflowEdgeDefinition(from_node="start", to_node="end")],
+            start_node="start",
+            end_nodes=["end"],
+        )
+
+        # Mock from_dapr_workflow and to_yaml to test the convenience method
+        with patch.object(exporter, 'from_dapr_workflow', return_value=workflow_def):
+            with patch.object(exporter, 'to_yaml', return_value='component_type: Flow\nname: yaml_export_workflow'):
+                def my_workflow(ctx: Any, params: dict) -> dict:
+                    """Test workflow."""
+                    return {}
+
+                result = exporter.export_workflow_to_yaml(my_workflow, [])
+                assert "yaml_export_workflow" in result
+                assert "component_type: Flow" in result
 
 
 class TestLoaderEdgeCases:
