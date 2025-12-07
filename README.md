@@ -1,55 +1,55 @@
 # Dapr Agents OAS Adapter
 
-Biblioteca adapter que permite interoperabilidade bidirecional entre [Open Agent Spec (OAS)](https://oracle.github.io/agent-spec/) e [Dapr Agents](https://docs.dapr.io/developing-applications/dapr-agents/).
+Adapter library enabling bidirectional interoperability between [Open Agent Spec (OAS)](https://oracle.github.io/agent-spec/) and [Dapr Agents](https://docs.dapr.io/developing-applications/dapr-agents/).
 
-## Características
+## Features
 
-- **Importação OAS → Dapr Agents**: Carrega especificações OAS (JSON/YAML) e cria agentes e workflows Dapr Agents executáveis
-- **Exportação Dapr Agents → OAS**: Exporta agentes e workflows Dapr para formato OAS
-- **Conversores de Componentes**: Suporte para Agent, Flow, LlmConfig, Tool, Node e Edge
-- **Geração de Código**: Gera código Python para workflows Dapr a partir de especificações OAS
-- **Compatibilidade**: Segue os padrões dos adapters existentes (LangGraph, CrewAI)
+- **OAS → Dapr Agents Import**: Loads OAS specifications (JSON/YAML) and creates executable Dapr Agents and workflows
+- **Dapr Agents → OAS Export**: Exports Dapr agents and workflows to OAS format
+- **Component Converters**: Support for Agent, Flow, LlmConfig, Tool, Node and Edge
+- **Code Generation**: Generates Python code for Dapr workflows from OAS specifications
+- **Compatibility**: Follows existing adapter patterns (LangGraph, CrewAI)
 
-## Instalação
+## Installation
 
 ```bash
 pip install dapr-agents-oas-adapter
 ```
 
-Ou com dependências de desenvolvimento:
+Or with development dependencies:
 
 ```bash
 pip install dapr-agents-oas-adapter[dev]
 ```
 
-## Uso Rápido
+## Quick Start
 
-### Carregar uma especificação OAS
+### Load an OAS specification
 
 ```python
 from dapr_agents_oas_adapter import DaprAgentSpecLoader
 
-# Registrar implementações de tools
+# Register tool implementations
 def search_tool(query: str) -> list[str]:
-    """Busca na web."""
-    return ["resultado1", "resultado2"]
+    """Web search."""
+    return ["result1", "result2"]
 
 loader = DaprAgentSpecLoader(
     tool_registry={"search": search_tool}
 )
 
-# Carregar de JSON
+# Load from JSON
 with open("agent_spec.json") as f:
     config = loader.load_json(f.read())
 
-# Criar agente Dapr executável
+# Create executable Dapr agent
 agent = loader.create_agent(config)
 
-# Iniciar o agente
+# Start the agent
 await agent.start()
 ```
 
-### Exportar para OAS
+### Export to OAS
 
 ```python
 from dapr_agents_oas_adapter import DaprAgentSpecExporter
@@ -57,23 +57,23 @@ from dapr_agents_oas_adapter.types import DaprAgentConfig
 
 exporter = DaprAgentSpecExporter()
 
-# Configurar agente
+# Configure agent
 config = DaprAgentConfig(
-    name="meu_assistente",
-    role="Assistente",
-    goal="Ajudar usuários",
-    instructions=["Seja útil", "Seja conciso"],
+    name="my_assistant",
+    role="Assistant",
+    goal="Help users",
+    instructions=["Be helpful", "Be concise"],
     tools=["search", "calculator"],
 )
 
-# Exportar para JSON
+# Export to JSON
 json_spec = exporter.to_json(config)
 
-# Exportar para arquivo YAML
+# Export to YAML file
 exporter.to_yaml_file(config, "agent_spec.yaml")
 ```
 
-### Trabalhar com Workflows
+### Working with Workflows
 
 ```python
 from dapr_agents_oas_adapter import DaprAgentSpecLoader, DaprAgentSpecExporter
@@ -83,16 +83,16 @@ from dapr_agents_oas_adapter.types import (
     WorkflowEdgeDefinition,
 )
 
-# Criar definição de workflow
+# Create workflow definition
 workflow = WorkflowDefinition(
-    name="meu_workflow",
-    description="Processa dados do usuário",
+    name="my_workflow",
+    description="Processes user data",
     tasks=[
         WorkflowTaskDefinition(name="start", task_type="start"),
         WorkflowTaskDefinition(
             name="analyze",
             task_type="llm",
-            config={"prompt_template": "Analise: {{input}}"},
+            config={"prompt_template": "Analyze: {{input}}"},
         ),
         WorkflowTaskDefinition(name="end", task_type="end"),
     ],
@@ -104,31 +104,31 @@ workflow = WorkflowDefinition(
     end_nodes=["end"],
 )
 
-# Exportar para OAS
+# Export to OAS
 exporter = DaprAgentSpecExporter()
 oas_spec = exporter.to_json(workflow)
 
-# Gerar código Python do workflow
+# Generate workflow Python code
 loader = DaprAgentSpecLoader()
 code = loader.generate_workflow_code(workflow)
 print(code)
 ```
 
-## Mapeamento de Componentes
+## Component Mapping
 
 | OAS Component | Dapr Agents Equivalent |
 |---------------|------------------------|
 | `Agent` | `AssistantAgent` / `ReActAgent` |
 | `Flow` | `@workflow` decorated function |
-| `LlmNode` | `@task` com chamada LLM |
-| `ToolNode` | `@task` com tool call |
-| `StartNode` | Entry point do workflow |
-| `EndNode` | Return do workflow |
+| `LlmNode` | `@task` with LLM call |
+| `ToolNode` | `@task` with tool call |
+| `StartNode` | Workflow entry point |
+| `EndNode` | Workflow return |
 | `ServerTool` | `@tool` decorated function |
 | `MCPTool` | MCP integration via Dapr |
 | `LlmConfig` | `DaprChatClient` config |
-| `ControlFlowEdge` | Sequência de `yield ctx.call_activity()` |
-| `DataFlowEdge` | Passagem de parâmetros entre tasks |
+| `ControlFlowEdge` | Sequence of `yield ctx.call_activity()` |
+| `DataFlowEdge` | Parameter passing between tasks |
 
 ## API Reference
 
@@ -165,30 +165,30 @@ class DaprAgentSpecExporter:
     def export_agent_to_yaml(self, agent: Any) -> str
 ```
 
-## Desenvolvimento
+## Development
 
 ### Setup
 
 ```bash
-git clone https://github.com/seu-usuario/dapr-agents-oas-adapter.git
+git clone https://github.com/your-username/dapr-agents-oas-adapter.git
 cd dapr-agents-oas-adapter
 uv sync --all-extras
 ```
 
-### Executar Testes
+### Run Tests
 
 ```bash
 pytest
 ```
 
-### Linting e Type Checking
+### Linting and Type Checking
 
 ```bash
 ruff check src/
 mypy src/
 ```
 
-## Requisitos
+## Requirements
 
 - Python >= 3.12
 - pyagentspec >= 25.4.1
@@ -196,7 +196,7 @@ mypy src/
 - dapr >= 1.16.0
 - pydantic >= 2.0.0
 
-## Licença
+## License
 
 MIT License
 
@@ -206,4 +206,3 @@ MIT License
 - [Dapr Agents](https://docs.dapr.io/developing-applications/dapr-agents/)
 - [PyAgentSpec](https://github.com/oracle/agent-spec)
 - [Dapr](https://dapr.io/)
-
