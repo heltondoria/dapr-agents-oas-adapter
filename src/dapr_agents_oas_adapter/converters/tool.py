@@ -158,12 +158,26 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         name = tool_dict.get("name", "")
         implementation = self._tool_registry.get(name)
 
+        # Extract MCP transport config if this is an MCPTool
+        # Always set mcp_transport for MCPTool to preserve component type,
+        # even if client_transport is empty
+        mcp_transport = None
+        if tool_dict.get("component_type") == "MCPTool":
+            client_transport = tool_dict.get("client_transport", {})
+            mcp_transport = {
+                "type": client_transport.get("component_type", "SSETransport"),
+                "url": client_transport.get("url"),
+                "headers": client_transport.get("headers"),
+                "session_parameters": client_transport.get("session_parameters"),
+            }
+
         return ToolDefinition(
             name=name,
             description=tool_dict.get("description", ""),
             inputs=tool_dict.get("inputs", []),
             outputs=tool_dict.get("outputs", []),
             implementation=implementation,
+            mcp_transport=mcp_transport,
         )
 
     def to_dict(self, tool_def: ToolDefinition) -> dict[str, Any]:
@@ -175,6 +189,32 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         Returns:
             Dictionary representation of the tool
         """
+        # Export as MCPTool if there's transport config
+        if tool_def.mcp_transport:
+            transport = tool_def.mcp_transport
+            client_transport: dict[str, Any] = {
+                "component_type": transport.get("type", "SSETransport"),
+                "id": generate_id("transport"),
+                "name": f"{tool_def.name}_transport",
+            }
+            # Add optional transport fields (use 'is not None' to preserve empty values)
+            if transport.get("url") is not None:
+                client_transport["url"] = transport["url"]
+            if transport.get("headers") is not None:
+                client_transport["headers"] = transport["headers"]
+            if transport.get("session_parameters") is not None:
+                client_transport["session_parameters"] = transport["session_parameters"]
+
+            return {
+                "component_type": "MCPTool",
+                "id": generate_id("tool"),
+                "name": tool_def.name,
+                "description": tool_def.description,
+                "inputs": tool_def.inputs,
+                "outputs": tool_def.outputs,
+                "client_transport": client_transport,
+            }
+
         return {
             "component_type": "ServerTool",
             "id": generate_id("tool"),
@@ -299,23 +339,31 @@ class MCPToolConverter(ToolConverter):
         """
         base_def = super().from_oas(component)
 
-        # Extract MCP-specific configuration
-        if MCPTool is not None and isinstance(component, MCPTool):
-            transport = getattr(component, "client_transport", None)
-            if transport:
-                # Store MCP transport info in tool definition
-                base_def.inputs.append({
-                    "title": "_mcp_transport",
-                    "type": "object",
-                    "description": "MCP transport configuration",
-                    "default": self._extract_transport_config(transport),
-                })
+        # Extract MCP-specific configuration from client_transport
+        # Works regardless of whether MCPTool class is available
+        # Use 'is not None' to preserve MCPTool type even with empty transport
+        transport = getattr(component, "client_transport", None)
+        if transport is not None:
+            base_def.mcp_transport = self._extract_transport_config(transport)
 
         return base_def
 
     def _extract_transport_config(self, transport: Any) -> dict[str, Any]:
-        """Extract MCP transport configuration."""
+        """Extract MCP transport configuration.
+
+        Args:
+            transport: The transport object (SSETransport, etc.)
+
+        Returns:
+            Dictionary with transport configuration
+        """
         config: dict[str, Any] = {}
+
+        # Get transport type from class name or component_type
+        transport_type = getattr(transport, "component_type", None)
+        if not transport_type:
+            transport_type = type(transport).__name__
+        config["type"] = transport_type
 
         if hasattr(transport, "url"):
             config["url"] = transport.url

@@ -74,6 +74,7 @@ class ToolDefinition:
     inputs: list[PropertySchema]
     outputs: list[PropertySchema]
     implementation: Callable[..., Any] | None = None
+    mcp_transport: dict[str, Any] | None = None  # MCP transport config (SSE/HTTP)
 
 
 @dataclass
