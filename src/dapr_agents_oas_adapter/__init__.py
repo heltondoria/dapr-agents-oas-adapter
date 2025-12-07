@@ -9,7 +9,7 @@ configurations and Dapr Agents components, enabling:
 from dapr_agents_oas_adapter.exporter import DaprAgentSpecExporter
 from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 
-__version__ = "0.1.0"
+__version__ = "0.4.0"
 __all__ = [
     "DaprAgentSpecExporter",
     "DaprAgentSpecLoader",

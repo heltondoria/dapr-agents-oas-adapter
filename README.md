@@ -13,13 +13,11 @@ Adapter library enabling bidirectional interoperability between [Open Agent Spec
 ## Installation
 
 ```bash
+# Using uv (recommended)
+uv add dapr-agents-oas-adapter
+
+# Or using pip
 pip install dapr-agents-oas-adapter
-```
-
-Or with development dependencies:
-
-```bash
-pip install dapr-agents-oas-adapter[dev]
 ```
 
 ## Quick Start
@@ -170,22 +168,22 @@ class DaprAgentSpecExporter:
 ### Setup
 
 ```bash
-git clone https://github.com/your-username/dapr-agents-oas-adapter.git
+git clone https://github.com/heltondoria/dapr-agents-oas-adapter.git
 cd dapr-agents-oas-adapter
-uv sync --all-extras
+uv sync --all-groups
 ```
 
 ### Run Tests
 
 ```bash
-pytest
+uv run pytest
 ```
 
 ### Linting and Type Checking
 
 ```bash
-ruff check src/
-mypy src/
+uv run ruff check src/
+uv run mypy src/
 ```
 
 ## Requirements
@@ -198,7 +196,7 @@ mypy src/
 
 ## License
 
-MIT License
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Links
 
