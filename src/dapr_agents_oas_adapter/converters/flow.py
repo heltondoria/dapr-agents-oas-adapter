@@ -3,26 +3,13 @@
 from collections.abc import Callable
 from typing import Any
 
-from pyagentspec import Component
+from pyagentspec import Component, Property  # noqa: F401
 
-# Import flow components with fallback for different pyagentspec versions
-try:
-    from pyagentspec.flows import (
-        ControlFlowEdge,
-        DataFlowEdge,
-        EndNode,
-        Flow,
-        Node,
-        StartNode,
-    )
-except ImportError:
-    # Fallback for older versions
-    Flow = Component
-    Node = Component
-    StartNode = Component
-    EndNode = Component
-    ControlFlowEdge = Component
-    DataFlowEdge = Component
+# Import flow components from correct submodules
+from pyagentspec.flows.edges import ControlFlowEdge, DataFlowEdge
+from pyagentspec.flows.flow import Flow
+from pyagentspec.flows.node import Node
+from pyagentspec.flows.nodes import EndNode, StartNode
 
 from dapr_agents_oas_adapter.converters.base import (
     ComponentConverter,
@@ -141,22 +128,33 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                     )
                     data_edges.append(data_edge)
 
-        # Find start node
-        start_node = node_map.get(component.start_node) if component.start_node else None
-        if not start_node and nodes:
+        # Find start node - create a default if none exists
+        start_node_obj = node_map.get(component.start_node) if component.start_node else None
+        if not start_node_obj and nodes:
             # Default to first node
-            start_node = nodes[0]
+            start_node_obj = nodes[0]
+        if not start_node_obj:
+            # Create a minimal start node if no nodes exist
+            start_node_obj = StartNode(
+                id=generate_id("start"),
+                name="start",
+            )
+            nodes.insert(0, start_node_obj)
+
+        # Convert inputs/outputs to Property objects
+        flow_inputs = self._dicts_to_properties(component.inputs)
+        flow_outputs = self._dicts_to_properties(component.outputs)
 
         return Flow(
             id=flow_id,
             name=component.name,
             description=component.description,
-            start_node=start_node,
+            start_node=start_node_obj,
             nodes=nodes,
             control_flow_connections=control_edges,
             data_flow_connections=data_edges,
-            inputs=component.inputs,
-            outputs=component.outputs,
+            inputs=flow_inputs if flow_inputs else None,
+            outputs=flow_outputs if flow_outputs else None,
         )
 
     def can_convert(self, component: Any) -> bool:
@@ -572,6 +570,23 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 result.append(prop)
             elif hasattr(prop, "model_dump"):
                 result.append(prop.model_dump())
+        return result
+
+    def _dicts_to_properties(self, props: list[dict[str, Any]]) -> list[Property]:
+        """Convert dictionary property schemas to Property objects."""
+        result: list[Property] = []
+        for prop in props:
+            if isinstance(prop, dict):
+                result.append(
+                    Property(
+                        title=prop.get("title", ""),
+                        type=prop.get("type", "string"),
+                        description=prop.get("description"),
+                        default=prop.get("default"),
+                    )
+                )
+            elif isinstance(prop, Property):
+                result.append(prop)
         return result
 
     def _build_execution_order(self, workflow_def: WorkflowDefinition) -> list[str]:

@@ -2,30 +2,19 @@
 
 from typing import Any
 
-from pyagentspec import Component
+from pyagentspec import Component, Property  # noqa: F401
 
-# Import flow components with fallback for different pyagentspec versions
-try:
-    from pyagentspec.flows import (
-        AgentNode,
-        EndNode,
-        FlowNode,
-        LlmNode,
-        MapNode,
-        Node,
-        StartNode,
-        ToolNode,
-    )
-except ImportError:
-    # Fallback for older versions - use Component as base
-    Node = Component
-    StartNode = Component
-    EndNode = Component
-    LlmNode = Component
-    ToolNode = Component
-    AgentNode = Component
-    FlowNode = Component
-    MapNode = Component
+# Import flow components from correct submodules
+from pyagentspec.flows.node import Node
+from pyagentspec.flows.nodes import (
+    AgentNode,
+    EndNode,
+    FlowNode,
+    LlmNode,
+    MapNode,
+    StartNode,
+    ToolNode,
+)
 
 from dapr_agents_oas_adapter.converters.base import (
     ComponentConverter,
@@ -82,52 +71,79 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
         Returns:
             OAS Node with equivalent settings
         """
+        from pyagentspec.llms import VllmConfig
+        from pyagentspec.tools import ServerTool
+
         node_id = generate_id("node")
         node_class = self._get_node_class(component.task_type)
 
-        # Build inputs/outputs from names
-        inputs = [{"title": name, "type": "string"} for name in component.inputs]
-        outputs = [{"title": name, "type": "string"} for name in component.outputs]
+        # Build inputs/outputs as Property objects
+        inputs = self._dicts_to_properties(component.inputs)
+        outputs = self._dicts_to_properties(component.outputs)
 
         if node_class == StartNode:
             return StartNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs,
-                outputs=inputs,  # StartNode passes inputs as outputs
+                inputs=inputs if inputs else None,
+                outputs=inputs if inputs else None,  # StartNode passes inputs as outputs
             )
         elif node_class == EndNode:
             return EndNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs,
-                outputs=outputs,
+                inputs=inputs if inputs else None,
+                outputs=outputs if outputs else None,
             )
         elif node_class == LlmNode:
+            # Get or create default LLM config
+            llm_config = component.config.get("llm_config")
+            if llm_config is None:
+                llm_config = VllmConfig(
+                    id=generate_id("llm"),
+                    name="default_llm",
+                    model_id="gpt-4",
+                    url="https://api.openai.com/v1",
+                )
             return LlmNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs,
-                outputs=outputs,
+                inputs=inputs if inputs else None,
+                outputs=outputs if outputs else None,
                 prompt_template=component.config.get("prompt_template", ""),
-                llm_config=component.config.get("llm_config"),
+                llm_config=llm_config,
             )
         elif node_class == ToolNode:
+            # Get or create default tool
+            tool = component.config.get("tool")
+            if tool is None:
+                tool = ServerTool(
+                    id=generate_id("tool"),
+                    name=component.name,
+                    description=f"Tool: {component.name}",
+                )
             return ToolNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs,
-                outputs=outputs,
-                tool=component.config.get("tool"),
+                inputs=inputs if inputs else None,
+                outputs=outputs if outputs else None,
+                tool=tool,
             )
         else:
-            # Default to a generic node representation
+            # Default to a generic node representation (LlmNode)
+            default_llm = VllmConfig(
+                id=generate_id("llm"),
+                name="default_llm",
+                model_id="gpt-4",
+                url="https://api.openai.com/v1",
+            )
             return LlmNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs,
-                outputs=outputs,
+                inputs=inputs if inputs else None,
+                outputs=outputs if outputs else None,
                 prompt_template=component.config.get("prompt_template", ""),
+                llm_config=default_llm,
             )
 
     def can_convert(self, component: Any) -> bool:
@@ -305,25 +321,61 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
         return [p.get("title", "") if isinstance(p, dict) else str(p) for p in outputs]
 
     def _serialize_llm_config(self, llm_config: Any) -> dict[str, Any]:
-        """Serialize an LLM config to dictionary."""
-        if hasattr(llm_config, "model_dump"):
-            return llm_config.model_dump()
-        elif hasattr(llm_config, "__dict__"):
-            return dict(llm_config.__dict__)
-        return {}
+        """Serialize an LLM config to dictionary.
+
+        Uses pyagentspec's serializer to handle Component objects properly.
+        """
+        return self._serialize_component(llm_config)
 
     def _serialize_tool(self, tool: Any) -> dict[str, Any]:
-        """Serialize a tool to dictionary."""
-        if hasattr(tool, "model_dump"):
-            return tool.model_dump()
-        elif hasattr(tool, "__dict__"):
-            return dict(tool.__dict__)
-        return {}
+        """Serialize a tool to dictionary.
+
+        Uses pyagentspec's serializer to handle Component objects properly.
+        """
+        return self._serialize_component(tool)
 
     def _serialize_agent(self, agent: Any) -> dict[str, Any]:
-        """Serialize an agent to dictionary."""
-        if hasattr(agent, "model_dump"):
-            return agent.model_dump()
-        elif hasattr(agent, "__dict__"):
-            return dict(agent.__dict__)
-        return {}
+        """Serialize an agent to dictionary.
+
+        Uses pyagentspec's serializer to handle Component objects properly.
+        """
+        return self._serialize_component(agent)
+
+    def _serialize_component(self, component: Any) -> dict[str, Any]:
+        """Serialize a pyagentspec Component to dictionary.
+
+        Uses the proper serialization context required by pyagentspec.
+        Falls back to model_dump() or __dict__ to preserve all attributes.
+        """
+        try:
+            from pyagentspec.serialization import AgentSpecSerializer
+
+            serializer = AgentSpecSerializer()
+            # Use to_json then parse back to dict to get proper serialization
+            import json
+
+            json_str = serializer.to_json(component)
+            return json.loads(json_str)
+        except Exception:
+            # Fallback 1: try model_dump() for Pydantic models
+            model_dump = getattr(component, "model_dump", None)
+            if callable(model_dump):
+                result = model_dump()
+                if isinstance(result, dict):
+                    return result
+
+            # Fallback 2: try __dict__ for plain objects
+            if hasattr(component, "__dict__"):
+                return dict(component.__dict__)
+
+            return {}
+
+    def _dicts_to_properties(self, names: list[str]) -> list[Property]:
+        """Convert a list of names to Property objects."""
+        return [
+            Property(
+                title=name,
+                type="string",
+            )
+            for name in names
+        ]

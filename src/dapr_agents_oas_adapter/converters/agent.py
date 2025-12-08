@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any
 
+from pyagentspec import Property
 from pyagentspec.agent import Agent as OASAgent
 
 from dapr_agents_oas_adapter.converters.base import (
@@ -88,7 +89,6 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             state_store_name=metadata.get("state_store_name", "statestore"),
             agents_registry_store_name=metadata.get("agents_registry_store_name", "agentsregistry"),
             service_port=metadata.get("service_port", 8000),
-            # Store additional config via model_config extra="allow"
             agent_type=agent_type.value,
             llm_config=self._extract_llm_config(component),
             tool_definitions=[self._tool_converter.to_dict(t) for t in tools],
@@ -109,7 +109,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         agent_id = generate_id("agent")
 
         # Build LLM config
-        llm_config_dict = getattr(component, "llm_config", None)
+        llm_config_dict = component.llm_config
         if llm_config_dict:
             llm_config = self._llm_converter.from_dict(llm_config_dict)
             oas_llm = self._llm_converter.to_oas(llm_config)
@@ -123,7 +123,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             )
 
         # Build tools
-        tool_defs = getattr(component, "tool_definitions", [])
+        tool_defs = component.tool_definitions or []
         oas_tools = []
         for tool_dict in tool_defs:
             tool_def = self._tool_converter.from_dict(tool_dict)
@@ -132,8 +132,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         # Build system prompt
         system_prompt = component.system_prompt or self._build_system_prompt(component)
 
-        # Build inputs from variables
-        inputs = self._build_inputs(component)
+        # Build inputs from variables as Property objects
+        inputs = self._build_inputs_as_properties(component)
 
         return OASAgent(
             id=agent_id,
@@ -143,7 +143,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             system_prompt=system_prompt,
             tools=oas_tools,
             inputs=inputs,
-            outputs=[],
+            outputs=None,
         )
 
     def can_convert(self, component: Any) -> bool:
@@ -232,8 +232,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         Returns:
             Dictionary representation of the agent
         """
-        llm_config = getattr(config, "llm_config", {})
-        tool_defs = getattr(config, "tool_definitions", [])
+        llm_config = config.llm_config or {}
+        tool_defs = config.tool_definitions or []
 
         return {
             "component_type": "Agent",
@@ -269,8 +269,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             ConversionError: If agent creation fails
         """
         try:
-            from dapr_agents import AssistantAgent
-            from dapr_agents import tool as dapr_tool
+            from dapr_agents import AssistantAgent  # type: ignore[import-not-found]
+            from dapr_agents import tool as dapr_tool  # type: ignore[import-not-found]
 
             # Merge tool registries
             all_tools = {**self._tool_registry}
@@ -288,10 +288,10 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     decorated_tools.append(func)
 
             # Determine agent class
-            agent_type = getattr(config, "agent_type", DaprAgentType.ASSISTANT_AGENT.value)
+            agent_type = config.agent_type or DaprAgentType.ASSISTANT_AGENT.value
 
             if agent_type == DaprAgentType.REACT_AGENT.value:
-                from dapr_agents import ReActAgent
+                from dapr_agents import ReActAgent  # type: ignore[import-not-found]
 
                 return ReActAgent(
                     name=config.name,
@@ -416,9 +416,9 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         return "\n".join(parts)
 
     def _build_inputs(self, config: DaprAgentConfig) -> list[dict[str, Any]]:
-        """Build OAS inputs from Dapr config."""
+        """Build OAS inputs from Dapr config as dictionaries."""
         inputs: list[dict[str, Any]] = []
-        input_vars = getattr(config, "input_variables", [])
+        input_vars = config.input_variables or []
 
         for var in input_vars:
             inputs.append(
@@ -426,6 +426,21 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     "title": var,
                     "type": "string",
                 }
+            )
+
+        return inputs
+
+    def _build_inputs_as_properties(self, config: DaprAgentConfig) -> list[Property]:
+        """Build OAS inputs from Dapr config as Property objects."""
+        inputs: list[Property] = []
+        input_vars = config.input_variables or []
+
+        for var in input_vars:
+            inputs.append(
+                Property(
+                    title=var,
+                    type="string",
+                )
             )
 
         return inputs

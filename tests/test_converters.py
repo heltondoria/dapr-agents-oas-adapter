@@ -1854,7 +1854,7 @@ class TestNodeConverter:
 
         # Create a mock that will pass isinstance(node, LlmNode)
         mock_node = MagicMock()
-        mock_node.__class__ = LlmNode
+        mock_node.__class__ = LlmNode  # type: ignore[assignment]
         mock_node.prompt_template = "Test prompt"
         mock_node.llm_config = None
 
@@ -1871,7 +1871,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = ToolNode
+        mock_node.__class__ = ToolNode  # type: ignore[assignment]
         mock_tool = MagicMock()
         mock_tool.name = "my_tool"
         mock_tool.model_dump.return_value = {"name": "my_tool"}
@@ -1887,7 +1887,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = AgentNode
+        mock_node.__class__ = AgentNode  # type: ignore[assignment]
         mock_agent = MagicMock()
         mock_agent.model_dump.return_value = {"name": "assistant"}
         mock_node.agent = mock_agent
@@ -1902,7 +1902,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = FlowNode
+        mock_node.__class__ = FlowNode  # type: ignore[assignment]
         mock_flow = MagicMock()
         mock_flow.id = "flow_123"
         mock_flow.name = "sub_flow"
@@ -1918,7 +1918,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = MapNode
+        mock_node.__class__ = MapNode  # type: ignore[assignment]
         mock_node.parallel = True
         mock_inner = MagicMock()
         mock_inner.id = "inner_123"
@@ -2065,28 +2065,37 @@ class TestNodeConverter:
         assert result == ["output1", "output2"]
 
     def test_serialize_llm_config_with_model_dump(self) -> None:
-        """Test _serialize_llm_config with model_dump."""
+        """Test _serialize_llm_config with model_dump fallback."""
         converter = NodeConverter()
 
-        mock_config = MagicMock()
-        mock_config.model_dump.return_value = {"model": "gpt-4", "temperature": 0.7}
+        # Create object with model_dump method
+        class LlmConfig:
+            def model_dump(self) -> dict[str, Any]:
+                return {"model": "gpt-4", "temperature": 0.7, "custom_field": "value"}
 
-        result = converter._serialize_llm_config(mock_config)
-        assert result == {"model": "gpt-4", "temperature": 0.7}
+        config = LlmConfig()
+        result = converter._serialize_llm_config(config)
+        assert result["model"] == "gpt-4"
+        assert result["temperature"] == 0.7
+        assert result["custom_field"] == "value"
 
     def test_serialize_llm_config_with_dict(self) -> None:
-        """Test _serialize_llm_config with __dict__."""
+        """Test _serialize_llm_config with __dict__ fallback preserves all attrs."""
         converter = NodeConverter()
 
         class SimpleConfig:
             def __init__(self) -> None:
-                self.model = "gpt-4"
+                self.name = "simple"
+                self.model_id = "gpt-4"
                 self.temperature = 0.5
+                self.custom_setting = "custom"
 
         config = SimpleConfig()
         result = converter._serialize_llm_config(config)
-        assert result["model"] == "gpt-4"
+        assert result["name"] == "simple"
+        assert result["model_id"] == "gpt-4"
         assert result["temperature"] == 0.5
+        assert result["custom_setting"] == "custom"
 
     def test_serialize_llm_config_empty(self) -> None:
         """Test _serialize_llm_config returns empty dict for unsupported."""
@@ -2095,26 +2104,32 @@ class TestNodeConverter:
         assert result == {}
 
     def test_serialize_tool_with_model_dump(self) -> None:
-        """Test _serialize_tool with model_dump."""
+        """Test _serialize_tool with model_dump fallback."""
         converter = NodeConverter()
 
-        mock_tool = MagicMock()
-        mock_tool.model_dump.return_value = {"name": "calc", "description": "Calculator"}
+        class Tool:
+            def model_dump(self) -> dict[str, Any]:
+                return {"name": "calc", "description": "Calculator", "custom": True}
 
-        result = converter._serialize_tool(mock_tool)
-        assert result == {"name": "calc", "description": "Calculator"}
+        tool = Tool()
+        result = converter._serialize_tool(tool)
+        assert result["name"] == "calc"
+        assert result["description"] == "Calculator"
+        assert result["custom"] is True
 
     def test_serialize_tool_with_dict(self) -> None:
-        """Test _serialize_tool with __dict__."""
+        """Test _serialize_tool with __dict__ preserves all attrs."""
         converter = NodeConverter()
 
         class SimpleTool:
             def __init__(self) -> None:
                 self.name = "tool"
+                self.version = "1.0"
 
         tool = SimpleTool()
         result = converter._serialize_tool(tool)
         assert result["name"] == "tool"
+        assert result["version"] == "1.0"
 
     def test_serialize_tool_empty(self) -> None:
         """Test _serialize_tool returns empty dict for unsupported."""
@@ -2123,28 +2138,34 @@ class TestNodeConverter:
         assert result == {}
 
     def test_serialize_agent_with_model_dump(self) -> None:
-        """Test _serialize_agent with model_dump."""
+        """Test _serialize_agent with model_dump fallback."""
         converter = NodeConverter()
 
-        mock_agent = MagicMock()
-        mock_agent.model_dump.return_value = {"name": "assistant", "role": "helper"}
+        class Agent:
+            def model_dump(self) -> dict[str, Any]:
+                return {"name": "assistant", "role": "helper", "custom_attr": 123}
 
-        result = converter._serialize_agent(mock_agent)
-        assert result == {"name": "assistant", "role": "helper"}
+        agent = Agent()
+        result = converter._serialize_agent(agent)
+        assert result["name"] == "assistant"
+        assert result["role"] == "helper"
+        assert result["custom_attr"] == 123
 
     def test_serialize_agent_with_dict(self) -> None:
-        """Test _serialize_agent with __dict__."""
+        """Test _serialize_agent with __dict__ preserves all attrs."""
         converter = NodeConverter()
 
         class SimpleAgent:
             def __init__(self) -> None:
                 self.name = "agent"
                 self.role = "assistant"
+                self.custom = "value"
 
         agent = SimpleAgent()
         result = converter._serialize_agent(agent)
         assert result["name"] == "agent"
         assert result["role"] == "assistant"
+        assert result["custom"] == "value"
 
     def test_serialize_agent_empty(self) -> None:
         """Test _serialize_agent returns empty dict for unsupported."""

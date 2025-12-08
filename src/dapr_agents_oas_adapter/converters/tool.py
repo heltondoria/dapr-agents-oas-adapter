@@ -8,9 +8,9 @@ from pyagentspec.tools import RemoteTool, ServerTool, Tool
 
 # MCPTool may not be available in all versions
 try:
-    from pyagentspec.tools import MCPTool
+    from pyagentspec.tools import MCPTool  # type: ignore[attr-defined]
 except ImportError:
-    MCPTool = None
+    MCPTool = None  # type: ignore[misc, assignment]
 
 from dapr_agents_oas_adapter.converters.base import (
     ComponentConverter,

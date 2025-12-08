@@ -127,8 +127,11 @@ class DaprAgentConfig(BaseModel):
     state_store_name: str = "statestore"
     agents_registry_store_name: str = "agentsregistry"
     service_port: int = 8000
-
-    model_config = {"extra": "allow"}
+    # Additional fields for type safety
+    agent_type: str | None = None
+    llm_config: dict[str, Any] | None = None
+    tool_definitions: list[dict[str, Any]] = []
+    input_variables: list[str] = []
 
 
 # Component type mappings

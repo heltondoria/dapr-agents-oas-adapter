@@ -6,13 +6,8 @@ from typing import Any
 
 from pyagentspec import Component
 from pyagentspec.agent import Agent as OASAgent
+from pyagentspec.flows.flow import Flow
 from pyagentspec.serialization import AgentSpecDeserializer
-
-# Import Flow with fallback
-try:
-    from pyagentspec.flows import Flow
-except ImportError:
-    Flow = Component
 
 from dapr_agents_oas_adapter.converters.agent import AgentConverter
 from dapr_agents_oas_adapter.converters.base import ConversionError
