@@ -93,6 +93,13 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             llm_config=self._extract_llm_config(component),
             tool_definitions=[self._tool_converter.to_dict(t) for t in tools],
             input_variables=template_vars,
+            # DurableAgent-specific fields from metadata
+            agent_topic=metadata.get("agent_topic"),
+            broadcast_topic=metadata.get("broadcast_topic"),
+            state_key_prefix=metadata.get("state_key_prefix"),
+            memory_store_name=metadata.get("memory_store_name"),
+            memory_session_id=metadata.get("memory_session_id"),
+            registry_team_name=metadata.get("registry_team_name"),
         )
 
     def to_oas(self, component: DaprAgentConfig) -> OASAgent:
@@ -135,6 +142,33 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         # Build inputs from variables as Property objects
         inputs = self._build_inputs_as_properties(component)
 
+        # Build metadata with DurableAgent-specific fields and core config
+        # Use `is not None` to preserve empty strings (not truthy checks)
+        metadata: dict[str, Any] = {}
+        if component.agent_type is not None:
+            metadata["dapr_agent_type"] = component.agent_type
+        if component.agent_topic is not None:
+            metadata["agent_topic"] = component.agent_topic
+        if component.broadcast_topic is not None:
+            metadata["broadcast_topic"] = component.broadcast_topic
+        if component.state_key_prefix is not None:
+            metadata["state_key_prefix"] = component.state_key_prefix
+        if component.memory_store_name is not None:
+            metadata["memory_store_name"] = component.memory_store_name
+        if component.memory_session_id is not None:
+            metadata["memory_session_id"] = component.memory_session_id
+        if component.registry_team_name is not None:
+            metadata["registry_team_name"] = component.registry_team_name
+        # Include core configuration fields if they differ from defaults
+        if component.message_bus_name != "messagepubsub":
+            metadata["message_bus_name"] = component.message_bus_name
+        if component.state_store_name != "statestore":
+            metadata["state_store_name"] = component.state_store_name
+        if component.agents_registry_store_name != "agentsregistry":
+            metadata["agents_registry_store_name"] = component.agents_registry_store_name
+        if component.service_port != 8000:
+            metadata["service_port"] = component.service_port
+
         return OASAgent(
             id=agent_id,
             name=component.name,
@@ -144,6 +178,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             tools=oas_tools,
             inputs=inputs,
             outputs=None,
+            metadata=metadata if metadata else None,
         )
 
     def can_convert(self, component: Any) -> bool:
@@ -204,6 +239,18 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         role = agent_dict.get("role") or agent_dict.get("name", "")
         goal = agent_dict.get("goal") or agent_dict.get("description", "")
 
+        # Extract metadata for DurableAgent-specific fields
+        # Use `or {}` to handle both missing keys and explicit None values
+        metadata = agent_dict.get("metadata") or {}
+
+        # Helper to get value from dict with fallback to metadata
+        # Uses `is not None` to preserve empty strings (not `or` which treats "" as falsy)
+        def _get_with_fallback(key: str, meta_key: str | None = None) -> Any:
+            value = agent_dict.get(key)
+            if value is not None:
+                return value
+            return metadata.get(meta_key or key)
+
         return DaprAgentConfig(
             name=agent_dict.get("name", ""),
             role=role,
@@ -217,10 +264,18 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 "agents_registry_store_name", "agentsregistry"
             ),
             service_port=agent_dict.get("service_port", 8000),
-            agent_type=agent_dict.get("agent_type", DaprAgentType.ASSISTANT_AGENT.value),
+            # Use _get_with_fallback to preserve empty strings (not treat as falsy)
+            agent_type=_get_with_fallback("agent_type", "dapr_agent_type"),
             llm_config=llm_config,
             tool_definitions=tool_definitions,
             input_variables=template_vars,
+            # DurableAgent-specific fields from metadata or direct dict keys
+            agent_topic=_get_with_fallback("agent_topic"),
+            broadcast_topic=_get_with_fallback("broadcast_topic"),
+            state_key_prefix=_get_with_fallback("state_key_prefix"),
+            memory_store_name=_get_with_fallback("memory_store_name"),
+            memory_session_id=_get_with_fallback("memory_session_id"),
+            registry_team_name=_get_with_fallback("registry_team_name"),
         )
 
     def to_dict(self, config: DaprAgentConfig) -> dict[str, Any]:
@@ -235,7 +290,35 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         llm_config = config.llm_config or {}
         tool_defs = config.tool_definitions or []
 
-        return {
+        # Build metadata with DurableAgent-specific fields if present
+        # Use `is not None` to preserve empty strings (not truthy checks)
+        metadata: dict[str, Any] = {}
+        if config.agent_type is not None:
+            metadata["dapr_agent_type"] = config.agent_type
+        if config.agent_topic is not None:
+            metadata["agent_topic"] = config.agent_topic
+        if config.broadcast_topic is not None:
+            metadata["broadcast_topic"] = config.broadcast_topic
+        if config.state_key_prefix is not None:
+            metadata["state_key_prefix"] = config.state_key_prefix
+        if config.memory_store_name is not None:
+            metadata["memory_store_name"] = config.memory_store_name
+        if config.memory_session_id is not None:
+            metadata["memory_session_id"] = config.memory_session_id
+        if config.registry_team_name is not None:
+            metadata["registry_team_name"] = config.registry_team_name
+
+        # Include core configuration fields if they differ from defaults
+        if config.message_bus_name != "messagepubsub":
+            metadata["message_bus_name"] = config.message_bus_name
+        if config.state_store_name != "statestore":
+            metadata["state_store_name"] = config.state_store_name
+        if config.agents_registry_store_name != "agentsregistry":
+            metadata["agents_registry_store_name"] = config.agents_registry_store_name
+        if config.service_port != 8000:
+            metadata["service_port"] = config.service_port
+
+        result: dict[str, Any] = {
             "component_type": "Agent",
             "id": generate_id("agent"),
             "name": config.name,
@@ -247,7 +330,17 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             "tools": tool_defs,
             "inputs": self._build_inputs(config),
             "outputs": [],
+            # Include core config fields at top level for easier access
+            "message_bus_name": config.message_bus_name,
+            "state_store_name": config.state_store_name,
+            "agents_registry_store_name": config.agents_registry_store_name,
+            "service_port": config.service_port,
         }
+
+        if metadata:
+            result["metadata"] = metadata
+
+        return result
 
     def create_dapr_agent(
         self,
@@ -263,7 +356,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             tool_implementations: Optional tool implementations
 
         Returns:
-            A Dapr Agent instance (AssistantAgent or ReActAgent)
+            A Dapr Agent instance (AssistantAgent, ReActAgent, or DurableAgent)
 
         Raises:
             ConversionError: If agent creation fails
@@ -299,6 +392,91 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     instructions=config.instructions,
                     tools=decorated_tools,
                 )
+            elif agent_type == DaprAgentType.DURABLE_AGENT.value:
+                from dapr_agents import DurableAgent  # type: ignore[import-not-found]
+                from dapr_agents.agents.configs import (  # type: ignore[import-not-found]
+                    AgentMemoryConfig,
+                    AgentPubSubConfig,
+                    AgentRegistryConfig,
+                    AgentStateConfig,
+                )
+                from dapr_agents.memory import (
+                    ConversationDaprStateMemory,  # type: ignore[import-not-found]
+                )
+                from dapr_agents.storage.daprstores.stateservice import (
+                    StateStoreService,  # type: ignore[import-not-found]
+                )
+
+                # Create LLM client (required for DurableAgent)
+                llm_client = self._create_llm_client(config.llm_config)
+
+                # Configure PubSub
+                # Use `is not None` to preserve empty strings (not `or` which treats "" as falsy)
+                pubsub_config = AgentPubSubConfig(
+                    pubsub_name=config.message_bus_name,
+                    agent_topic=(
+                        config.agent_topic
+                        if config.agent_topic is not None
+                        else f"{config.name}.requests"
+                    ),
+                    broadcast_topic=(
+                        config.broadcast_topic
+                        if config.broadcast_topic is not None
+                        else "broadcast"
+                    ),
+                )
+
+                # Configure State
+                state_store = StateStoreService(
+                    store_name=config.state_store_name,
+                    key_prefix=(
+                        config.state_key_prefix
+                        if config.state_key_prefix is not None
+                        else f"{config.name}:"
+                    ),
+                )
+                state_config = AgentStateConfig(store=state_store)
+
+                # Configure Memory
+                memory_store = ConversationDaprStateMemory(
+                    store_name=(
+                        config.memory_store_name
+                        if config.memory_store_name is not None
+                        else "memorystore"
+                    ),
+                    session_id=(
+                        config.memory_session_id
+                        if config.memory_session_id is not None
+                        else f"{config.name}-session"
+                    ),
+                )
+                memory_config = AgentMemoryConfig(store=memory_store)
+
+                # Configure Registry
+                registry_store = StateStoreService(
+                    store_name=config.agents_registry_store_name,
+                )
+                registry_config = AgentRegistryConfig(
+                    store=registry_store,
+                    team_name=config.registry_team_name,
+                ) if config.registry_team_name else None
+
+                # Create DurableAgent with all configurations
+                durable_agent_kwargs: dict[str, Any] = {
+                    "name": config.name,
+                    "role": config.role or config.name,
+                    "goal": config.goal,
+                    "instructions": config.instructions,
+                    "tools": decorated_tools,
+                    "llm": llm_client,
+                    "pubsub": pubsub_config,
+                    "state": state_config,
+                    "memory": memory_config,
+                }
+                if registry_config:
+                    durable_agent_kwargs["registry"] = registry_config
+
+                return DurableAgent(**durable_agent_kwargs)
             else:
                 return AssistantAgent(
                     name=config.name,
@@ -323,16 +501,81 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 config,
             ) from e
 
+    def _create_llm_client(self, llm_config: dict[str, Any] | None) -> Any:
+        """Create a Dapr LLM client from configuration.
+
+        Args:
+            llm_config: Dictionary with LLM configuration
+
+        Returns:
+            A Dapr LLM client instance
+
+        Raises:
+            ConversionError: If client creation fails
+        """
+        try:
+            provider = llm_config.get("provider", "openai") if llm_config else "openai"
+            model_id = llm_config.get("model_id", "gpt-4") if llm_config else "gpt-4"
+
+            if provider == "openai":
+                from dapr_agents.llm.openai import (
+                    OpenAIChatClient,  # type: ignore[import-not-found]
+                )
+
+                return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
+            elif provider == "ollama":
+                from dapr_agents.llm.ollama import (
+                    OllamaChatClient,  # type: ignore[import-not-found]
+                )
+
+                url = (
+                    llm_config.get("url", "http://localhost:11434")
+                    if llm_config
+                    else "http://localhost:11434"
+                )
+                return OllamaChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
+            elif provider == "vllm":
+                from dapr_agents.llm.openai import (
+                    OpenAIChatClient,  # type: ignore[import-not-found]
+                )
+
+                url = llm_config.get("url") if llm_config else None
+                return OpenAIChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
+            else:
+                # Default to OpenAI-compatible client
+                from dapr_agents.llm.openai import (
+                    OpenAIChatClient,  # type: ignore[import-not-found]
+                )
+
+                return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
+        except ImportError as e:
+            raise ConversionError(
+                f"Failed to import LLM client: {e}. Make sure dapr-agents is installed.",
+            ) from e
+
     def _determine_agent_type(self, component: OASAgent) -> DaprAgentType:
         """Determine the appropriate Dapr agent type for an OAS Agent."""
         # Check metadata for explicit type
+        # Use `is not None` to preserve empty strings (not truthy checks)
         if component.metadata:
             explicit_type = component.metadata.get("dapr_agent_type")
-            if explicit_type:
+            if explicit_type is not None:
                 try:
                     return DaprAgentType(explicit_type)
                 except ValueError:
                     pass
+
+            # Check for DurableAgent-specific configuration in metadata
+            durable_agent_keys = [
+                "agent_topic",
+                "broadcast_topic",
+                "registry_team_name",
+                "memory_store_name",
+                "memory_session_id",
+                "state_key_prefix",
+            ]
+            if any(key in component.metadata for key in durable_agent_keys):
+                return DaprAgentType.DURABLE_AGENT
 
         # Check if agent has tools (suggests ReActAgent)
         tools = getattr(component, "tools", [])

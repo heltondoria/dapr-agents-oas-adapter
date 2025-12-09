@@ -132,6 +132,13 @@ class DaprAgentConfig(BaseModel):
     llm_config: dict[str, Any] | None = None
     tool_definitions: list[dict[str, Any]] = []
     input_variables: list[str] = []
+    # DurableAgent-specific configuration fields
+    agent_topic: str | None = None
+    broadcast_topic: str | None = None
+    state_key_prefix: str | None = None
+    memory_store_name: str | None = None
+    memory_session_id: str | None = None
+    registry_team_name: str | None = None
 
 
 # Component type mappings
