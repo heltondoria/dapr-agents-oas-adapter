@@ -456,10 +456,14 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 registry_store = StateStoreService(
                     store_name=config.agents_registry_store_name,
                 )
-                registry_config = AgentRegistryConfig(
-                    store=registry_store,
-                    team_name=config.registry_team_name,
-                ) if config.registry_team_name else None
+                registry_config = (
+                    AgentRegistryConfig(
+                        store=registry_store,
+                        team_name=config.registry_team_name,
+                    )
+                    if config.registry_team_name
+                    else None
+                )
 
                 # Create DurableAgent with all configurations
                 durable_agent_kwargs: dict[str, Any] = {

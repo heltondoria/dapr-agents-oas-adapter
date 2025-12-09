@@ -1865,6 +1865,7 @@ class TestAgentConverter:
             {"dapr_agents": MagicMock()},
         ):
             import sys
+
             mock_module = sys.modules["dapr_agents"]
             mock_module.AssistantAgent.side_effect = RuntimeError("Test error")
 
@@ -1882,6 +1883,7 @@ class TestAgentConverter:
             {"dapr_agents": MagicMock(), "dapr_agents.llm.ollama": MagicMock()},
         ):
             import sys
+
             mock_ollama = MagicMock()
             sys.modules["dapr_agents.llm.ollama"].OllamaChatClient = mock_ollama
 
@@ -1898,6 +1900,7 @@ class TestAgentConverter:
             {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
         ):
             import sys
+
             mock_openai = MagicMock()
             sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
 
@@ -1914,6 +1917,7 @@ class TestAgentConverter:
             {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
         ):
             import sys
+
             mock_openai = MagicMock()
             sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
 
