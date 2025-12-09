@@ -1798,6 +1798,154 @@ class TestAgentConverter:
         assert result.metadata.get("state_key_prefix") == "oas:"
         assert result.metadata.get("memory_store_name") == "oasmemory"
 
+    def test_to_oas_includes_service_port_in_metadata(self) -> None:
+        """Test to_oas includes service_port in metadata when non-default."""
+        converter = AgentConverter()
+        config = DaprAgentConfig(
+            name="custom_port_test",
+            role="Helper",
+            goal="Help",
+            service_port=9000,  # Non-default port
+        )
+        result = converter.to_oas(config)
+        assert result.metadata is not None
+        assert result.metadata.get("service_port") == 9000
+
+    def test_can_convert_with_oas_agent(self) -> None:
+        """Test can_convert returns True for OASAgent instances."""
+        from pyagentspec.agent import Agent as OASAgent
+        from pyagentspec.llms import VllmConfig
+
+        converter = AgentConverter()
+        oas_agent = OASAgent(
+            id="test-id",
+            name="test_agent",
+            description="Test agent",
+            llm_config=VllmConfig(
+                id="llm-1",
+                name="test-llm",
+                model_id="gpt-4",
+                url="http://localhost:8000",
+            ),
+            system_prompt="You are a helpful assistant.",
+        )
+        assert converter.can_convert(oas_agent) is True
+
+    def test_can_convert_with_dapr_agent_config(self) -> None:
+        """Test can_convert returns True for DaprAgentConfig instances."""
+        converter = AgentConverter()
+        config = DaprAgentConfig(name="test")
+        assert converter.can_convert(config) is True
+
+    def test_can_convert_with_invalid_dict(self) -> None:
+        """Test can_convert returns False for non-Agent dicts."""
+        converter = AgentConverter()
+        assert converter.can_convert({"component_type": "Tool"}) is False
+        assert converter.can_convert({"name": "no_type"}) is False
+
+    def test_can_convert_with_non_convertible(self) -> None:
+        """Test can_convert returns False for non-convertible types."""
+        converter = AgentConverter()
+        assert converter.can_convert("string") is False
+        assert converter.can_convert(123) is False
+        assert converter.can_convert(None) is False
+
+    def test_create_dapr_agent_generic_exception(self) -> None:
+        """Test create_dapr_agent handles generic exceptions."""
+        converter = AgentConverter()
+        config = DaprAgentConfig(
+            name="exception_test",
+            role="Tester",
+            agent_type="AssistantAgent",
+        )
+
+        # Mock AssistantAgent to raise a generic exception
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock()},
+        ):
+            import sys
+            mock_module = sys.modules["dapr_agents"]
+            mock_module.AssistantAgent.side_effect = RuntimeError("Test error")
+
+            with pytest.raises(ConversionError) as exc_info:
+                converter.create_dapr_agent(config)
+            assert "Failed to create Dapr Agent" in str(exc_info.value)
+
+    def test_create_llm_client_ollama_provider(self) -> None:
+        """Test _create_llm_client with Ollama provider."""
+        converter = AgentConverter()
+        llm_config = {"provider": "ollama", "model_id": "llama2", "url": "http://custom:11434"}
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock(), "dapr_agents.llm.ollama": MagicMock()},
+        ):
+            import sys
+            mock_ollama = MagicMock()
+            sys.modules["dapr_agents.llm.ollama"].OllamaChatClient = mock_ollama
+
+            converter._create_llm_client(llm_config)
+            mock_ollama.assert_called_once_with(model="llama2", base_url="http://custom:11434")
+
+    def test_create_llm_client_vllm_provider(self) -> None:
+        """Test _create_llm_client with vLLM provider."""
+        converter = AgentConverter()
+        llm_config = {"provider": "vllm", "model_id": "mistral", "url": "http://vllm:8000"}
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
+        ):
+            import sys
+            mock_openai = MagicMock()
+            sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(model="mistral", base_url="http://vllm:8000")
+
+    def test_create_llm_client_unknown_provider(self) -> None:
+        """Test _create_llm_client with unknown provider defaults to OpenAI."""
+        converter = AgentConverter()
+        llm_config = {"provider": "unknown_provider", "model_id": "custom-model"}
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
+        ):
+            import sys
+            mock_openai = MagicMock()
+            sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(model="custom-model")
+
+    def test_create_llm_client_import_error(self) -> None:
+        """Test _create_llm_client raises ConversionError on ImportError."""
+        converter = AgentConverter()
+        llm_config = {"provider": "openai", "model_id": "gpt-4"}
+
+        # Remove dapr_agents from modules to trigger ImportError
+        with patch.dict("sys.modules", {"dapr_agents.llm.openai": None}):
+            with pytest.raises(ConversionError) as exc_info:
+                converter._create_llm_client(llm_config)
+            assert "Failed to import LLM client" in str(exc_info.value)
+
+    def test_build_inputs_as_properties_with_variables(self) -> None:
+        """Test _build_inputs_as_properties creates Property objects."""
+        converter = AgentConverter()
+        config = DaprAgentConfig(
+            name="inputs_test",
+            role="Helper",
+            input_variables=["question", "context", "history"],
+        )
+        result = converter._build_inputs_as_properties(config)
+        assert len(result) == 3
+        assert result[0].title == "question"
+        assert result[0].type == "string"
+        assert result[1].title == "context"
+        assert result[2].title == "history"
+
     def test_round_trip_preserves_empty_string_values(self) -> None:
         """Test round-trip conversion preserves empty strings (not treated as falsy)."""
         converter = AgentConverter()
