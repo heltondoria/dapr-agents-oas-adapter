@@ -1,6 +1,6 @@
 [project]
 name = "dapr-agents-oas-adapter"
-version = "0.4.1"
+version = "0.5.0"
 description = "Adapter library to make Dapr Agents compatible with Open Agent Spec"
 readme = "README.md"
 authors = [
