@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Mantém dependências Python atualizadas
+  # Keep Python dependencies up to date
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -13,7 +13,7 @@ updates:
       - "dependencies"
       - "python"
 
-  # Mantém GitHub Actions atualizadas
+  # Keep GitHub Actions up to date
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

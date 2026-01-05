@@ -168,11 +168,11 @@ class ConverterRegistry:
                 return converter
         return None
 
-    def convert_from_oas(self, component: Component) -> Any:
+    def convert_from_oas(self, component: Any) -> Any:
         """Convert an OAS component using the appropriate converter.
 
         Args:
-            component: The OAS component to convert
+            component: The OAS component (or object) to convert
 
         Returns:
             The converted Dapr Agents component
@@ -186,7 +186,7 @@ class ConverterRegistry:
                 f"No converter found for component type: {type(component).__name__}",
                 component,
             )
-        return converter.from_oas(component)
+        return converter.from_oas(component)  # type: ignore[arg-type]
 
     def convert_to_oas(self, component: Any) -> Component:
         """Convert a Dapr component using the appropriate converter.

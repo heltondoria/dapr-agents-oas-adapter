@@ -3,13 +3,26 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
 # Type aliases for clarity
 type ToolRegistry = dict[str, Callable[..., Any]]
 type PropertySchema = dict[str, Any]
+
+
+class NamedCallable(Protocol):
+    """Callable that exposes function-like metadata (useful for type checkers).
+
+    Not every Python `Callable` guarantees a `__name__` attribute (e.g., instances with `__call__`),
+    but generated functions/wrappers typically expose these fields and tests rely on them.
+    """
+
+    __name__: str
+    __doc__: str | None
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
 
 
 class OASComponentType(str, Enum):
