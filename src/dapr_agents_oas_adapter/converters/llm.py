@@ -94,7 +94,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
             extra_params=extra_params,
         )
 
-    def to_oas(self, component: LlmClientConfig) -> LlmConfig:
+    def to_oas(self, component: LlmClientConfig) -> VllmConfig | OpenAiConfig | OllamaConfig:
         """Convert a Dapr LlmClientConfig to OAS LlmConfig.
 
         Args:
@@ -111,13 +111,6 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         if oas_type is None:
             raise ConversionError(
                 f"Unsupported Dapr LLM provider: {component.provider}",
-                component,
-            )
-
-        llm_class = self.OAS_LLM_TYPES.get(oas_type)
-        if llm_class is None:
-            raise ConversionError(
-                f"No OAS class found for type: {oas_type}",
                 component,
             )
 

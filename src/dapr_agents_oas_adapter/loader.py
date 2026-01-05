@@ -4,7 +4,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from pyagentspec import Component
 from pyagentspec.agent import Agent as OASAgent
 from pyagentspec.flows.flow import Flow
 from pyagentspec.serialization import AgentSpecDeserializer
@@ -14,6 +13,7 @@ from dapr_agents_oas_adapter.converters.base import ConversionError
 from dapr_agents_oas_adapter.converters.flow import FlowConverter
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
+    NamedCallable,
     ToolRegistry,
     WorkflowDefinition,
 )
@@ -157,11 +157,11 @@ class DaprAgentSpecLoader:
         content = path.read_text(encoding="utf-8")
         return self.load_yaml(content)
 
-    def load_component(self, component: Component) -> DaprAgentConfig | WorkflowDefinition:
+    def load_component(self, component: Any) -> DaprAgentConfig | WorkflowDefinition:
         """Load a PyAgentSpec Component and convert to Dapr format.
 
         Args:
-            component: The OAS Component to convert
+            component: The OAS Component (ou objeto) a converter
 
         Returns:
             DaprAgentConfig for Agent components, WorkflowDefinition for Flows
@@ -227,7 +227,7 @@ class DaprAgentSpecLoader:
         self,
         workflow_def: WorkflowDefinition,
         task_implementations: dict[str, Callable[..., Any]] | None = None,
-    ) -> Callable[..., Any]:
+    ) -> NamedCallable:
         """Create an executable Dapr workflow from definition.
 
         Args:

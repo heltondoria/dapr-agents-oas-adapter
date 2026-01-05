@@ -1,6 +1,6 @@
 """Tests for converter modules."""
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -281,6 +281,9 @@ class TestLlmConfigConverter:
         )
 
         result = converter.to_oas(config)
+        from pyagentspec.llms import VllmConfig
+
+        assert isinstance(result, VllmConfig)
         assert result.model_id == "llama-3"
         assert result.url == "http://localhost:8000"
 
@@ -293,6 +296,9 @@ class TestLlmConfigConverter:
         )
 
         result = converter.to_oas(config)
+        from pyagentspec.llms import OpenAiConfig
+
+        assert isinstance(result, OpenAiConfig)
         assert result.model_id == "gpt-4"
 
     def test_to_oas_ollama(self) -> None:
@@ -305,6 +311,9 @@ class TestLlmConfigConverter:
         )
 
         result = converter.to_oas(config)
+        from pyagentspec.llms import OllamaConfig
+
+        assert isinstance(result, OllamaConfig)
         assert result.model_id == "llama2"
         assert result.url == "http://localhost:11434"
 
@@ -357,6 +366,21 @@ class TestToolConverter:
         converter = ToolConverter()
         tool_def = converter.from_callable(my_func, name="custom_name")
         assert tool_def.name == "custom_name"
+
+    def test_from_callable_with_callable_object_without___name__(self) -> None:
+        """Test from_callable handles callable objects without __name__."""
+
+        class CallableObject:
+            """Callable object tool."""
+
+            def __call__(self, query: str) -> str:
+                return f"echo:{query}"
+
+        converter = ToolConverter()
+        tool_def = converter.from_callable(CallableObject())
+
+        assert tool_def.name == "CallableObject"
+        assert "Callable object tool" in tool_def.description
 
     def test_from_callable_no_docstring(self) -> None:
         """Test from_callable without docstring."""
@@ -1880,15 +1904,16 @@ class TestAgentConverter:
 
         with patch.dict(
             "sys.modules",
-            {"dapr_agents": MagicMock(), "dapr_agents.llm.ollama": MagicMock()},
+            {"dapr_agents": MagicMock()},
         ):
             import sys
 
-            mock_ollama = MagicMock()
-            sys.modules["dapr_agents.llm.ollama"].OllamaChatClient = mock_ollama
+            mock_openai = MagicMock()
+            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
-            mock_ollama.assert_called_once_with(model="llama2", base_url="http://custom:11434")
+            mock_openai.assert_called_once_with(model="llama2", base_url="http://custom:11434")
 
     def test_create_llm_client_vllm_provider(self) -> None:
         """Test _create_llm_client with vLLM provider."""
@@ -1897,12 +1922,13 @@ class TestAgentConverter:
 
         with patch.dict(
             "sys.modules",
-            {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
+            {"dapr_agents": MagicMock()},
         ):
             import sys
 
             mock_openai = MagicMock()
-            sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
+            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
             mock_openai.assert_called_once_with(model="mistral", base_url="http://vllm:8000")
@@ -1914,12 +1940,13 @@ class TestAgentConverter:
 
         with patch.dict(
             "sys.modules",
-            {"dapr_agents": MagicMock(), "dapr_agents.llm.openai": MagicMock()},
+            {"dapr_agents": MagicMock()},
         ):
             import sys
 
             mock_openai = MagicMock()
-            sys.modules["dapr_agents.llm.openai"].OpenAIChatClient = mock_openai
+            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
             mock_openai.assert_called_once_with(model="custom-model")
@@ -1930,7 +1957,7 @@ class TestAgentConverter:
         llm_config = {"provider": "openai", "model_id": "gpt-4"}
 
         # Remove dapr_agents from modules to trigger ImportError
-        with patch.dict("sys.modules", {"dapr_agents.llm.openai": None}):
+        with patch.dict("sys.modules", {"dapr_agents": None}):
             with pytest.raises(ConversionError) as exc_info:
                 converter._create_llm_client(llm_config)
             assert "Failed to import LLM client" in str(exc_info.value)
@@ -3050,7 +3077,7 @@ class TestFlowConverter:
         converter = FlowConverter()
         # Use isinstance check via duck typing
         try:
-            from pyagentspec.flows import Flow
+            from pyagentspec.flows.flow import Flow
 
             mock_flow = MagicMock(spec=Flow)
             # Set required attributes
@@ -3373,7 +3400,7 @@ class TestFlowConverter:
         """Test _find_start_node finds StartNode in nodes list."""
         # Import using the same fallback as the converter
         try:
-            from pyagentspec.flows import StartNode
+            from pyagentspec.flows.nodes import StartNode
         except ImportError:
             from pyagentspec import Component as StartNode
 
@@ -3412,7 +3439,7 @@ class TestFlowConverter:
         """Test _find_end_nodes finds all EndNode instances."""
         # Import using the same fallback as the converter
         try:
-            from pyagentspec.flows import EndNode
+            from pyagentspec.flows.nodes import EndNode
         except ImportError:
             from pyagentspec import Component as EndNode
 
@@ -3581,6 +3608,9 @@ class TestConverterRegistry:
         )
 
         result = registry.convert_to_oas(config)
+        from pyagentspec.llms import VllmConfig
+
+        assert isinstance(result, VllmConfig)
         assert result.model_id == "llama"
 
     def test_convert_to_oas_no_converter(self) -> None:

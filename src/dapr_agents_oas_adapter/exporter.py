@@ -89,11 +89,11 @@ class DaprAgentSpecExporter:
         oas_component = self.to_component(component)
         return self._serializer.to_yaml(oas_component)
 
-    def to_dict(self, component: DaprAgentConfig | WorkflowDefinition) -> dict[str, Any]:
+    def to_dict(self, component: Any) -> dict[str, Any]:
         """Export a Dapr component to OAS dictionary format.
 
         Args:
-            component: The Dapr component to export
+            component: O componente Dapr a exportar (ou objeto)
 
         Returns:
             Dictionary containing the OAS specification

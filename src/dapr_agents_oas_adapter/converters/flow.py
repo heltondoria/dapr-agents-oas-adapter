@@ -17,6 +17,7 @@ from dapr_agents_oas_adapter.converters.base import (
 )
 from dapr_agents_oas_adapter.converters.node import NodeConverter
 from dapr_agents_oas_adapter.types import (
+    NamedCallable,
     ToolRegistry,
     WorkflowDefinition,
     WorkflowEdgeDefinition,
@@ -345,7 +346,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         self,
         workflow_def: WorkflowDefinition,
         task_implementations: dict[str, Callable[..., Any]] | None = None,
-    ) -> Callable[..., Any]:
+    ) -> NamedCallable:
         """Create a Dapr workflow function from a WorkflowDefinition.
 
         Args:

@@ -18,6 +18,7 @@ from dapr_agents_oas_adapter.converters.base import (
 )
 from dapr_agents_oas_adapter.types import (
     PYTHON_TO_JSON_SCHEMA,
+    NamedCallable,
     PropertySchema,
     ToolDefinition,
     ToolRegistry,
@@ -117,8 +118,8 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         Returns:
             ToolDefinition representing the callable
         """
-        func_name = name or func.__name__
-        description = func.__doc__ or f"Tool: {func_name}"
+        func_name = self._callable_name(func, override=name)
+        description = inspect.getdoc(func) or f"Tool: {func_name}"
 
         # Extract input parameters from signature
         inputs = self._extract_inputs_from_callable(func)
@@ -225,7 +226,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             "outputs": tool_def.outputs,
         }
 
-    def create_dapr_tool(self, tool_def: ToolDefinition) -> Callable[..., Any]:
+    def create_dapr_tool(self, tool_def: ToolDefinition) -> NamedCallable:
         """Create a Dapr-compatible tool function from a ToolDefinition.
 
         This wraps the tool implementation with Dapr's @tool decorator pattern.
@@ -257,6 +258,13 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         tool_wrapper.__annotations__ = self._build_annotations_from_schema(tool_def.inputs)
 
         return tool_wrapper
+
+    @staticmethod
+    def _callable_name(func: Callable[..., Any], override: str | None = None) -> str:
+        """Get a callable name with a stable, testable fallback."""
+        if override:
+            return override
+        return getattr(func, "__name__", type(func).__name__)
 
     def _extract_properties(self, props: list[Any]) -> list[PropertySchema]:
         """Extract property schemas from OAS properties."""

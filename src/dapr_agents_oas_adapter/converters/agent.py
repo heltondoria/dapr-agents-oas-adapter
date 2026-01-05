@@ -522,34 +522,28 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             model_id = llm_config.get("model_id", "gpt-4") if llm_config else "gpt-4"
 
             if provider == "openai":
-                from dapr_agents.llm.openai import (
-                    OpenAIChatClient,  # type: ignore[import-not-found]
-                )
+                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
 
                 return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
             elif provider == "ollama":
-                from dapr_agents.llm.ollama import (
-                    OllamaChatClient,  # type: ignore[import-not-found]
-                )
+                # Dapr Agents does not expose a dedicated Ollama client in all versions.
+                # Treat Ollama as an OpenAI-compatible endpoint.
+                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
 
                 url = (
                     llm_config.get("url", "http://localhost:11434")
                     if llm_config
                     else "http://localhost:11434"
                 )
-                return OllamaChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
+                return OpenAIChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
             elif provider == "vllm":
-                from dapr_agents.llm.openai import (
-                    OpenAIChatClient,  # type: ignore[import-not-found]
-                )
+                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
 
                 url = llm_config.get("url") if llm_config else None
                 return OpenAIChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
             else:
                 # Default to OpenAI-compatible client
-                from dapr_agents.llm.openai import (
-                    OpenAIChatClient,  # type: ignore[import-not-found]
-                )
+                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
 
                 return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
         except ImportError as e:
