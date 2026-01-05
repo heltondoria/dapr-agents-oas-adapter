@@ -13,10 +13,10 @@ type PropertySchema = dict[str, Any]
 
 
 class NamedCallable(Protocol):
-    """Callable que expõe metadados de função (útil para type checkers).
+    """Callable that exposes function-like metadata (useful for type checkers).
 
-    Nem todo `Callable` em Python garante `__name__` (ex.: instâncias com `__call__`),
-    mas funções geradas/wrappers geralmente expõem esses campos e os testes dependem disso.
+    Not every Python `Callable` guarantees a `__name__` attribute (e.g., instances with `__call__`),
+    but generated functions/wrappers typically expose these fields and tests rely on them.
     """
 
     __name__: str

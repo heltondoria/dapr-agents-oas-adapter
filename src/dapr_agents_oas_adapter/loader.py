@@ -161,7 +161,7 @@ class DaprAgentSpecLoader:
         """Load a PyAgentSpec Component and convert to Dapr format.
 
         Args:
-            component: The OAS Component (ou objeto) a converter
+            component: The OAS Component (or object) to convert
 
         Returns:
             DaprAgentConfig for Agent components, WorkflowDefinition for Flows

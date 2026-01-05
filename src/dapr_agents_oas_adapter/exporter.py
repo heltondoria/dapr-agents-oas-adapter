@@ -93,7 +93,7 @@ class DaprAgentSpecExporter:
         """Export a Dapr component to OAS dictionary format.
 
         Args:
-            component: O componente Dapr a exportar (ou objeto)
+            component: The Dapr component to export (or object)
 
         Returns:
             Dictionary containing the OAS specification
