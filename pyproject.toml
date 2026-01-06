@@ -86,7 +86,7 @@ testpaths = ["tests"]
 skip = ".git,.venv,.mypy_cache,uv.lock,htmlcov"
 check-filenames = true
 check-hidden = true
-ignore-words-list = "crate,fo,nd"
+ignore-words-list = "crate,fo,nd,instale"
 
 [tool.vulture]
 paths = ["."]

@@ -367,18 +367,25 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             def workflow_function(ctx: Any, input_params: dict[str, Any]) -> Any:
                 """Generated Dapr workflow function."""
                 results: dict[str, Any] = {"__input__": input_params}
+                # Treat the Start node as a pass-through of the workflow input so that
+                # data mappings from `start` work even though we don't execute an activity.
+                if workflow_def.start_node:
+                    results[workflow_def.start_node] = input_params
 
                 for task_name in execution_order:
                     task = next((t for t in workflow_def.tasks if t.name == task_name), None)
                     if not task:
                         continue
 
-                    # Skip start/end nodes
-                    if task.task_type in ("start", "end"):
-                        continue
-
                     # Get task input from previous results
                     task_input = self._build_task_input(task, results, workflow_def.edges)
+
+                    # Start/end nodes are structural; they don't map to real activities.
+                    if task.task_type == "start":
+                        continue
+                    if task.task_type == "end":
+                        results[task_name] = task_input
+                        continue
 
                     # Execute task
                     if task_implementations and task_name in task_implementations:
@@ -386,7 +393,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         result = impl(**task_input)
                     else:
                         # Use ctx.call_activity for Dapr workflow
-                        result = ctx.call_activity(task_name, input=task_input)
+                        result = yield ctx.call_activity(task_name, input=task_input)
 
                     results[task_name] = result
 
@@ -629,6 +636,11 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         for edge in edges:
             if edge.to_node == task.name:
                 source_result = results.get(edge.from_node, {})
+                if source_result is None:
+                    source_result = {}
+                if not isinstance(source_result, dict):
+                    # Normalize scalar results (e.g., str) so they can be mapped.
+                    source_result = {"result": source_result}
                 for source_key, dest_key in edge.data_mapping.items():
                     if isinstance(source_result, dict) and source_key in source_result:
                         task_input[dest_key] = source_result[source_key]
