@@ -36,7 +36,7 @@ llm = DaprChatClient(component_name="openai")
 
 @message_router(pubsub="messagepubsub", topic="blog.requests", message_model=StartBlogMessage)
 def blog_workflow(ctx: DaprWorkflowContext, wf_input: dict) -> object:
-    """Workflow disparado por Pub/Sub."""
+    """Workflow triggered by Pub/Sub."""
     topic = wf_input["topic"]
     outline = yield ctx.call_activity(create_outline, input={"topic": topic})
     post = yield ctx.call_activity(write_post, input={"outline": outline})

@@ -1,0 +1,167 @@
+component_type: Flow
+id: flow_e3a8207a
+name: blog_workflow
+description: Workflow triggered by Pub/Sub that creates an outline and writes a post.
+metadata: {}
+inputs:
+- description: ''
+  title: topic
+  default: null
+  type: string
+outputs:
+- description: ''
+  title: post
+  default: null
+  type: string
+start_node:
+  $component_ref: node_d2afcd92
+nodes:
+- $component_ref: node_d2afcd92
+- $component_ref: node_32566118
+- $component_ref: node_ae97282e
+- $component_ref: node_ec1b4ba5
+control_flow_connections:
+- component_type: ControlFlowEdge
+  id: edge_61f75e95
+  name: start_to_create_outline
+  description: null
+  metadata: {}
+  from_node:
+    $component_ref: node_d2afcd92
+  from_branch: null
+  to_node:
+    $component_ref: node_32566118
+- component_type: ControlFlowEdge
+  id: edge_30c9e720
+  name: create_outline_to_write_post
+  description: null
+  metadata: {}
+  from_node:
+    $component_ref: node_32566118
+  from_branch: null
+  to_node:
+    $component_ref: node_ae97282e
+- component_type: ControlFlowEdge
+  id: edge_5d88bdef
+  name: write_post_to_end
+  description: null
+  metadata: {}
+  from_node:
+    $component_ref: node_ae97282e
+  from_branch: null
+  to_node:
+    $component_ref: node_ec1b4ba5
+data_flow_connections:
+- component_type: DataFlowEdge
+  id: data_edge_1fcaea2a
+  name: topic_to_topic
+  description: null
+  metadata: {}
+  source_node:
+    $component_ref: node_d2afcd92
+  source_output: topic
+  destination_node:
+    $component_ref: node_32566118
+  destination_input: topic
+- component_type: DataFlowEdge
+  id: data_edge_6530b485
+  name: outline_to_outline
+  description: null
+  metadata: {}
+  source_node:
+    $component_ref: node_32566118
+  source_output: outline
+  destination_node:
+    $component_ref: node_ae97282e
+  destination_input: outline
+- component_type: DataFlowEdge
+  id: data_edge_ce6f098a
+  name: post_to_post
+  description: null
+  metadata: {}
+  source_node:
+    $component_ref: node_ae97282e
+  source_output: post
+  destination_node:
+    $component_ref: node_ec1b4ba5
+  destination_input: post
+$referenced_components:
+  node_d2afcd92:
+    component_type: StartNode
+    id: node_d2afcd92
+    name: start
+    description: null
+    metadata: {}
+    inputs:
+    - title: topic
+      type: string
+    outputs:
+    - title: topic
+      type: string
+    branches:
+    - next
+  node_32566118:
+    component_type: LlmNode
+    id: node_32566118
+    name: create_outline
+    description: null
+    metadata: {}
+    inputs:
+    - title: topic
+      type: string
+    outputs:
+    - title: outline
+      type: string
+    branches:
+    - next
+    llm_config:
+      component_type: VllmConfig
+      id: llm_13f020c8
+      name: default_llm
+      description: null
+      metadata: {}
+      default_generation_parameters: null
+      url: https://api.openai.com/v1
+      model_id: gpt-4
+    prompt_template: Create a short outline about {{topic}}. Output 3-5 bullet points.
+  node_ae97282e:
+    component_type: LlmNode
+    id: node_ae97282e
+    name: write_post
+    description: null
+    metadata: {}
+    inputs:
+    - title: outline
+      type: string
+    outputs:
+    - title: post
+      type: string
+    branches:
+    - next
+    llm_config:
+      component_type: VllmConfig
+      id: llm_5a3ac0d2
+      name: default_llm
+      description: null
+      metadata: {}
+      default_generation_parameters: null
+      url: https://api.openai.com/v1
+      model_id: gpt-4
+    prompt_template: 'Write a short blog post following this outline:
+
+      {{outline}}'
+  node_ec1b4ba5:
+    component_type: EndNode
+    id: node_ec1b4ba5
+    name: end
+    description: null
+    metadata: {}
+    inputs:
+    - title: post
+      type: string
+    outputs:
+    - title: post
+      type: string
+    branches: []
+    branch_name: next
+agentspec_version: 25.4.1

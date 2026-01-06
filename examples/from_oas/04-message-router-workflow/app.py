@@ -5,32 +5,18 @@ import contextlib
 import logging
 import signal
 import sys
+from asyncio import AbstractEventLoop
+from logging import Logger
 from pathlib import Path
+from typing import Any
 
-import dapr.ext.workflow as wf
-from dapr.clients import DaprClient
-from dapr_agents.llm.dapr import DaprChatClient
-from dapr_agents.workflow.decorators.routers import message_router
-from dapr_agents.workflow.utils.registration import register_message_routes
-from pydantic import BaseModel, Field
-
-from dapr_agents_oas_adapter import DaprAgentSpecLoader
-from dapr_agents_oas_adapter.types import WorkflowDefinition
-from examples._shared.llm_workflow_activities import build_llm_activities_from_workflow
-from examples._shared.optional_dotenv import try_load_dotenv
-from examples._shared.paths import find_repo_root
-
-try_load_dotenv()
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def _ensure_repo_root_on_sys_path() -> None:
     """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
-    anchor = Path(__file__).resolve()
+    anchor: Path = Path(__file__).resolve()
     for candidate in [anchor, *anchor.parents]:
         if (candidate / "pyproject.toml").exists():
-            candidate_str = str(candidate)
+            candidate_str = str(object=candidate)
             if candidate_str not in sys.path:
                 sys.path.insert(0, candidate_str)
             return
@@ -38,14 +24,38 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
+import dapr.ext.workflow as wf  # noqa: E402
+from dapr.clients import DaprClient  # noqa: E402
+from dapr_agents.llm.dapr import DaprChatClient  # noqa: E402
+from dapr_agents.workflow.decorators.routers import message_router  # noqa: E402
+from dapr_agents.workflow.utils.registration import register_message_routes  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+
+from dapr_agents_oas_adapter import DaprAgentSpecLoader  # noqa: E402
+from dapr_agents_oas_adapter.types import (  # noqa: E402
+    DaprAgentConfig,
+    NamedCallable,
+    WorkflowDefinition,
+)
+from examples._shared.llm_workflow_activities import (  # noqa: E402
+    build_llm_activities_from_workflow,
+)
+from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
+from examples._shared.paths import find_repo_root  # noqa: E402
+
+try_load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger: Logger = logging.getLogger(__name__)
+
 
 class StartBlogMessage(BaseModel):
     topic: str = Field(min_length=1, description="Blog topic/title")
 
 
 def _load_workflow_yaml() -> WorkflowDefinition:
-    repo_root = find_repo_root(anchor_file=__file__)
-    spec_path = (
+    repo_root: Path = find_repo_root(anchor_file=__file__)
+    spec_path: Path = (
         repo_root
         / "examples"
         / "to_oas"
@@ -54,14 +64,14 @@ def _load_workflow_yaml() -> WorkflowDefinition:
         / "blog_workflow.yaml"
     )
     loader = DaprAgentSpecLoader()
-    loaded = loader.load_yaml_file(spec_path)
+    loaded: DaprAgentConfig | WorkflowDefinition = loader.load_yaml_file(spec_path)
     if not isinstance(loaded, WorkflowDefinition):
         raise TypeError(f"Expected WorkflowDefinition, got: {type(loaded).__name__}")
     return loaded
 
 
 async def _wait_for_shutdown() -> None:
-    loop = asyncio.get_running_loop()
+    loop: AbstractEventLoop = asyncio.get_running_loop()
     stop = asyncio.Event()
 
     def _set_stop(*_: object) -> None:
@@ -78,7 +88,7 @@ async def _wait_for_shutdown() -> None:
 
 
 async def main() -> None:
-    workflow_def = _load_workflow_yaml()
+    workflow_def: WorkflowDefinition = _load_workflow_yaml()
 
     runtime = wf.WorkflowRuntime()
     llm = DaprChatClient(component_name="openai")
@@ -86,17 +96,16 @@ async def main() -> None:
     for activity in build_llm_activities_from_workflow(
         workflow_def=workflow_def,
         llm=llm,
-        runtime=runtime,
     ).values():
         runtime.register_activity(activity)
 
     loader = DaprAgentSpecLoader()
-    inner_workflow = loader.create_workflow(workflow_def)
+    inner_workflow: NamedCallable = loader.create_workflow(workflow_def)
 
     @message_router(pubsub="messagepubsub", topic="blog.requests", message_model=StartBlogMessage)
     def blog_workflow(ctx: wf.DaprWorkflowContext, wf_input: dict) -> object:
-        """Wrapper com message_router delegando para o workflow criado via OAS."""
-        output = yield from inner_workflow(ctx, wf_input)
+        """message_router wrapper that delegates to the workflow created from OAS."""
+        output: Any = yield from inner_workflow(ctx, wf_input)
         if isinstance(output, dict) and "post" in output:
             return str(output["post"])
         return str(output)

@@ -57,7 +57,6 @@ def main() -> int:
     for activity in build_llm_activities_from_workflow(
         workflow_def=workflow_def,
         llm=llm,
-        runtime=runtime,
     ).values():
         runtime.register_activity(activity)
 

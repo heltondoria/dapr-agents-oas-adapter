@@ -1,4 +1,4 @@
-"""Exporta spec OAS (YAML) do workflow de message-router."""
+"""Export the message-router workflow spec as OAS (YAML)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ from dapr_agents_oas_adapter.types import (
 def _build_blog_workflow_definition() -> WorkflowDefinition:
     return WorkflowDefinition(
         name="blog_workflow",
-        description="Workflow disparado por Pub/Sub que cria outline e escreve um post.",
+        description="Workflow triggered by Pub/Sub that creates an outline and writes a post.",
+        inputs=[{"title": "topic", "type": "string"}],
+        outputs=[{"title": "post", "type": "string"}],
         tasks=[
             WorkflowTaskDefinition(
                 name="start", task_type="start", inputs=["topic"], outputs=["topic"]
@@ -25,7 +27,7 @@ def _build_blog_workflow_definition() -> WorkflowDefinition:
                 task_type="llm",
                 config={
                     "prompt_template": (
-                        "Create a short outline about {topic}. Output 3-5 bullet points."
+                        "Create a short outline about {{ topic }}. Output 3-5 bullet points."
                     )
                 },
                 inputs=["topic"],
@@ -35,7 +37,7 @@ def _build_blog_workflow_definition() -> WorkflowDefinition:
                 name="write_post",
                 task_type="llm",
                 config={
-                    "prompt_template": "Write a short blog post following this outline:\n{outline}"
+                    "prompt_template": "Write a short blog post following this outline:\n{{ outline }}"
                 },
                 inputs=["outline"],
                 outputs=["post"],

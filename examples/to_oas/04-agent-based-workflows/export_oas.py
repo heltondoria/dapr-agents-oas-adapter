@@ -1,4 +1,4 @@
-"""Exporta specs OAS (YAML) dos agentes deste exemplo."""
+"""Export OAS specs (YAML) for the agents in this example."""
 
 from __future__ import annotations
 

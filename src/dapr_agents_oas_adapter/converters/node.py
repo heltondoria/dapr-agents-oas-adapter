@@ -108,7 +108,9 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             return LlmNode(
                 id=node_id,
                 name=component.name,
-                inputs=inputs if inputs else None,
+                # Let `pyagentspec` infer inputs from the prompt template placeholders.
+                # This avoids strict validation mismatches when callers provide only titles.
+                inputs=None,
                 outputs=outputs if outputs else None,
                 prompt_template=component.config.get("prompt_template", ""),
                 llm_config=llm_config,
@@ -313,12 +315,22 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
     def _extract_input_names(self, node: Node) -> list[str]:
         """Extract input property names from a node."""
         inputs = getattr(node, "inputs", [])
-        return [p.get("title", "") if isinstance(p, dict) else str(p) for p in inputs]
+        return [
+            p.get("title", "")
+            if isinstance(p, dict)
+            else getattr(p, "title", str(p))
+            for p in inputs
+        ]
 
     def _extract_output_names(self, node: Node) -> list[str]:
         """Extract output property names from a node."""
         outputs = getattr(node, "outputs", [])
-        return [p.get("title", "") if isinstance(p, dict) else str(p) for p in outputs]
+        return [
+            p.get("title", "")
+            if isinstance(p, dict)
+            else getattr(p, "title", str(p))
+            for p in outputs
+        ]
 
     def _serialize_llm_config(self, llm_config: Any) -> dict[str, Any]:
         """Serialize an LLM config to dictionary.

@@ -1,5 +1,6 @@
 """Flow converter for OAS <-> Dapr Agents workflows."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -363,6 +364,25 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             # Build the task execution order from edges
             execution_order = self._build_execution_order(workflow_def)
 
+            def _make_activity_stub(name: str) -> Callable[[Any, Any], Any]:
+                """Create a callable placeholder used only to reference an activity by name.
+
+                Dapr's workflow context expects a callable and derives the activity name from
+                `callable.__name__` (or `_dapr_alternate_name`). We use a stub to reference
+                activities that are registered separately in the WorkflowRuntime.
+                """
+
+                def _activity(_: Any, __: Any = None) -> Any:  # pragma: no cover
+                    raise RuntimeError("This stub should never be executed directly.")
+
+                _activity.__name__ = name
+                _activity.__qualname__ = name
+                return _activity
+
+            activity_stubs: dict[str, Callable[[Any, Any], Any]] = {
+                name: _make_activity_stub(name) for name in execution_order
+            }
+
             # Create the workflow function
             def workflow_function(ctx: Any, input_params: dict[str, Any]) -> Any:
                 """Generated Dapr workflow function."""
@@ -393,7 +413,10 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         result = impl(**task_input)
                     else:
                         # Use ctx.call_activity for Dapr workflow
-                        result = yield ctx.call_activity(task_name, input=task_input)
+                        result = yield ctx.call_activity(
+                            activity_stubs[task_name],
+                            input=task_input,
+                        )
 
                     results[task_name] = result
 
@@ -585,11 +608,13 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         result: list[Property] = []
         for prop in props:
             if isinstance(prop, dict):
+                description = prop.get("description")
                 result.append(
                     Property(
                         title=prop.get("title", ""),
                         type=prop.get("type", "string"),
-                        description=prop.get("description"),
+                        # `pyagentspec.Property` validates JSON schema; do not pass None.
+                        description=str(description) if description is not None else "",
                         default=prop.get("default"),
                     )
                 )
@@ -638,6 +663,10 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 source_result = results.get(edge.from_node, {})
                 if source_result is None:
                     source_result = {}
+                if isinstance(source_result, str):
+                    parsed = self._try_parse_json_dict(source_result)
+                    if parsed is not None:
+                        source_result = parsed
                 if not isinstance(source_result, dict):
                     # Normalize scalar results (e.g., str) so they can be mapped.
                     source_result = {"result": source_result}
@@ -646,6 +675,20 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         task_input[dest_key] = source_result[source_key]
 
         return task_input
+
+    @staticmethod
+    def _try_parse_json_dict(value: str) -> dict[str, Any] | None:
+        """Best-effort parse of a JSON object (dict) serialized as a string."""
+        raw = value.strip()
+        if not raw:
+            return None
+        if raw[0] != "{":
+            return None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
 
     def _build_workflow_output(
         self,

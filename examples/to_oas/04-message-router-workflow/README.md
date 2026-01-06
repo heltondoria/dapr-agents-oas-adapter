@@ -12,7 +12,7 @@ Run these commands from the repository root (the folder containing `pyproject.to
 uv run python examples/to_oas/04-message-router-workflow/export_oas.py
 ```
 
-2) Start the app (subscriber + workflow runtime):
+1) Start the app (subscriber + workflow runtime):
 
 ```bash
 RESOURCES_DIR=$(uv run python examples/to_oas/04-message-router-workflow/resolve_resources.py)
@@ -20,7 +20,7 @@ dapr run --app-id message-workflow --resources-path "$RESOURCES_DIR" -- python e
 rm -rf "$RESOURCES_DIR"
 ```
 
-3) In another terminal, publish a message:
+1) In another terminal, publish a message:
 
 ```bash
 RESOURCES_DIR=$(uv run python examples/to_oas/04-message-router-workflow/resolve_resources.py)

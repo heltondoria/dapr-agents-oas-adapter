@@ -12,7 +12,7 @@ Run these commands from the repository root (the folder containing `pyproject.to
 uv run python examples/to_oas/04-agent-based-workflows/export_oas.py
 ```
 
-2) Run the workflow with Dapr:
+1) Run the workflow with Dapr:
 
 ```bash
 RESOURCES_DIR=$(uv run python examples/to_oas/04-agent-based-workflows/resolve_resources.py)

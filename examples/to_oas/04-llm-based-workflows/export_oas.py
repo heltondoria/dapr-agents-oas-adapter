@@ -1,4 +1,4 @@
-"""Exporta specs OAS (YAML) para este exemplo."""
+"""Export OAS specs (YAML) for this example."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ def _build_single_task_workflow_definition() -> WorkflowDefinition:
     return WorkflowDefinition(
         name="single_task_workflow",
         description="Simple workflow: a single LLM activity.",
+        inputs=[{"title": "name", "type": "string"}],
+        outputs=[{"title": "bio", "type": "string"}],
         tasks=[
             WorkflowTaskDefinition(
                 name="start",
@@ -26,7 +28,8 @@ def _build_single_task_workflow_definition() -> WorkflowDefinition:
             WorkflowTaskDefinition(
                 name="describe_person",
                 task_type="llm",
-                config={"prompt_template": "Who was {name}?"},
+                # OAS templates use `{{ var }}` placeholders.
+                config={"prompt_template": "Who was {{ name }}?"},
                 inputs=["name"],
                 outputs=["bio"],
             ),
