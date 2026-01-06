@@ -6,6 +6,8 @@ This example **imports** the OAS YAMLs exported by:
 
 ### How to run (from the repo root)
 
+Run these commands from the repository root (the folder containing `pyproject.toml`).
+
 1) Ensure the YAMLs were exported:
 
 ```bash

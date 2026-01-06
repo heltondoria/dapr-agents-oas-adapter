@@ -4,6 +4,8 @@ Based on `dapr-agents/quickstarts/04-llm-based-workflows`.
 
 ### How to run
 
+Run these commands from the repository root (the folder containing `pyproject.toml`).
+
 1) Export OAS YAMLs:
 
 ```bash

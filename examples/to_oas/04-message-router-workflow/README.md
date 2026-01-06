@@ -4,6 +4,8 @@ Based on `dapr-agents/quickstarts/04-message-router-workflow`.
 
 ### How to run (from the repo root)
 
+Run these commands from the repository root (the folder containing `pyproject.toml`).
+
 1) Export the OAS YAML:
 
 ```bash

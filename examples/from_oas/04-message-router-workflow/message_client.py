@@ -11,6 +11,23 @@ from typing import Any
 
 from dapr.clients import DaprClient
 
+# Ensure the repo root is on sys.path so `import examples...` works when executing files directly.
+from pathlib import Path
+
+
+def _ensure_repo_root_on_sys_path() -> None:
+    """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
+    anchor = Path(__file__).resolve()
+    for candidate in [anchor, *anchor.parents]:
+        if (candidate / "pyproject.toml").exists():
+            candidate_str = str(candidate)
+            if candidate_str not in sys.path:
+                sys.path.insert(0, candidate_str)
+            return
+
+
+_ensure_repo_root_on_sys_path()
+
 PUBSUB_NAME = os.getenv("PUBSUB_NAME", "messagepubsub")
 TOPIC_NAME = os.getenv("TOPIC_NAME", "blog.requests")
 BLOG_TOPIC = os.getenv("BLOG_TOPIC", "AI Agents")

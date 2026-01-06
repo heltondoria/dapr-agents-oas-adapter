@@ -4,6 +4,8 @@ import asyncio
 import contextlib
 import logging
 import signal
+import sys
+from pathlib import Path
 
 import dapr.ext.workflow as wf
 from dapr.clients import DaprClient
@@ -22,6 +24,19 @@ try_load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def _ensure_repo_root_on_sys_path() -> None:
+    """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
+    anchor = Path(__file__).resolve()
+    for candidate in [anchor, *anchor.parents]:
+        if (candidate / "pyproject.toml").exists():
+            candidate_str = str(candidate)
+            if candidate_str not in sys.path:
+                sys.path.insert(0, candidate_str)
+            return
+
+
+_ensure_repo_root_on_sys_path()
 
 
 class StartBlogMessage(BaseModel):
