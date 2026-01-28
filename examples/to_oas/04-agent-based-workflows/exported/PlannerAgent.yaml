@@ -1,5 +1,5 @@
 component_type: Agent
-id: agent_6f99d66c
+id: agent_9845d1df
 name: PlannerAgent
 description: Create a concise 3-day trip outline for the given destination.
 metadata: null
@@ -7,7 +7,7 @@ inputs: []
 outputs: []
 llm_config:
   component_type: VllmConfig
-  id: llm_eb84bbc4
+  id: llm_7b9823d9
   name: default_llm
   description: null
   metadata: {}

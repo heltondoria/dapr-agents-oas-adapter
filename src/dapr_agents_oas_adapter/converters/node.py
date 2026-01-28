@@ -182,6 +182,28 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             config["llm_config"] = node_dict["llm_config"]
         if "tool" in node_dict:
             config["tool"] = node_dict["tool"]
+        if node_type == "FlowNode":
+            flow_ref = node_dict.get("flow") or node_dict.get("subflow")
+            if isinstance(flow_ref, dict):
+                config["flow_id"] = flow_ref.get("$component_ref", "")
+                config["flow_name"] = flow_ref.get("name", "")
+            elif flow_ref:
+                config["flow_id"] = str(flow_ref)
+        if node_type == "MapNode":
+            if "parallel" in node_dict:
+                config["parallel"] = bool(node_dict.get("parallel"))
+            flow_ref = node_dict.get("inner_flow") or node_dict.get("subflow") or node_dict.get("flow")
+            if isinstance(flow_ref, dict):
+                config["inner_flow_id"] = flow_ref.get("$component_ref", "")
+            elif flow_ref:
+                config["inner_flow_id"] = str(flow_ref)
+            if "map_input_key" in node_dict:
+                config["map_input_key"] = node_dict.get("map_input_key")
+            if "map_item_key" in node_dict:
+                config["map_item_key"] = node_dict.get("map_item_key")
+
+        metadata = node_dict.get("metadata") or {}
+        self._merge_runtime_metadata(config, metadata)
 
         return WorkflowTaskDefinition(
             name=node_dict.get("name", ""),
@@ -211,6 +233,31 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
         elif task_def.task_type == "tool":
             if "tool" in task_def.config:
                 result["tool"] = task_def.config["tool"]
+        elif task_def.task_type == "flow":
+            flow_id = task_def.config.get("flow_id") or task_def.config.get("subflow_id")
+            if flow_id:
+                result["subflow"] = {"$component_ref": flow_id}
+        elif task_def.task_type == "map":
+            result["parallel"] = bool(task_def.config.get("parallel", True))
+            inner_flow_id = task_def.config.get("inner_flow_id") or task_def.config.get("subflow_id")
+            if inner_flow_id:
+                result["subflow"] = {"$component_ref": inner_flow_id}
+
+        runtime_metadata = {}
+        for key in (
+            "retry_policy",
+            "timeout_seconds",
+            "compensation_activity",
+            "compensation_input",
+            "branch_output_key",
+            "map_input_key",
+            "map_item_key",
+            "on_error",
+        ):
+            if key in task_def.config:
+                runtime_metadata[key] = task_def.config[key]
+        if runtime_metadata:
+            result["metadata"] = {"dapr": runtime_metadata}
 
         return result
 
@@ -299,16 +346,23 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 config["agent_config"] = self._serialize_agent(agent)
 
         elif isinstance(node, FlowNode):
-            flow = getattr(node, "flow", None)
+            flow = getattr(node, "flow", None) or getattr(node, "subflow", None)
             if flow:
                 config["flow_id"] = getattr(flow, "id", "")
                 config["flow_name"] = getattr(flow, "name", "")
 
         elif isinstance(node, MapNode):
             config["parallel"] = getattr(node, "parallel", True)
-            inner_flow = getattr(node, "inner_flow", None)
+            inner_flow = (
+                getattr(node, "inner_flow", None)
+                or getattr(node, "subflow", None)
+                or getattr(node, "flow", None)
+            )
             if inner_flow:
                 config["inner_flow_id"] = getattr(inner_flow, "id", "")
+
+        metadata = getattr(node, "metadata", None) or {}
+        self._merge_runtime_metadata(config, metadata)
 
         return config
 
@@ -391,3 +445,25 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             )
             for name in names
         ]
+
+    @staticmethod
+    def _merge_runtime_metadata(config: dict[str, Any], metadata: dict[str, Any]) -> None:
+        """Merge runtime hints from metadata into config."""
+        if not isinstance(metadata, dict):
+            return
+        runtime = metadata.get("dapr") or metadata.get("x-dapr") or {}
+        if not isinstance(runtime, dict):
+            return
+        for key in (
+            "retry_policy",
+            "timeout_seconds",
+            "compensation_activity",
+            "compensation_input",
+            "branch_output_key",
+            "map_input_key",
+            "map_item_key",
+            "flow_name",
+            "on_error",
+        ):
+            if key in runtime and key not in config:
+                config[key] = runtime[key]

@@ -7,12 +7,12 @@ import logging
 import os
 import signal
 import sys
-from typing import Any
-
-from dapr.clients import DaprClient
 
 # Ensure the repo root is on sys.path so `import examples...` works when executing files directly.
 from pathlib import Path
+from typing import Any
+
+from dapr.clients import DaprClient
 
 
 def _ensure_repo_root_on_sys_path() -> None:

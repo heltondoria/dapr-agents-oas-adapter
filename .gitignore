@@ -76,3 +76,5 @@ dmypy.json
 
 
 .cursor
+secrets.json
+**/components/secrets.json

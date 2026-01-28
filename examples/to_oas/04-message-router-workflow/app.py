@@ -12,6 +12,7 @@ from dapr.clients import DaprClient
 from dapr_agents.workflow.utils.registration import register_message_routes
 from workflow import blog_workflow, create_outline, write_post
 
+
 def _ensure_repo_root_on_sys_path() -> None:
     """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
     anchor = Path(__file__).resolve()

@@ -1,0 +1,25 @@
+== APP - oas-from-agent-wf == Traceback (most recent call last):
+== APP - oas-from-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/src/dapr_agents_oas_adapter/converters/agent.py", line 365, in create_dapr_agent
+== APP - oas-from-agent-wf ==     from dapr_agents import AssistantAgent  # type: ignore[import-not-found]
+== APP - oas-from-agent-wf ==     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-from-agent-wf == ImportError: cannot import name 'AssistantAgent' from 'dapr_agents' (/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/__init__.py)
+== APP - oas-from-agent-wf == 
+== APP - oas-from-agent-wf == The above exception was the direct cause of the following exception:
+== APP - oas-from-agent-wf == 
+== APP - oas-from-agent-wf == Traceback (most recent call last):
+== APP - oas-from-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/examples/from_oas/04-agent-based-workflows/app.py", line 108, in <module>
+== APP - oas-from-agent-wf ==     raise SystemExit(main())
+== APP - oas-from-agent-wf ==                      ^^^^^^
+== APP - oas-from-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/examples/from_oas/04-agent-based-workflows/app.py", line 51, in main
+== APP - oas-from-agent-wf ==     extractor = loader.create_agent(_load_agent_yaml("DestinationExtractor"))
+== APP - oas-from-agent-wf ==                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-from-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/src/dapr_agents_oas_adapter/loader.py", line 224, in create_agent
+== APP - oas-from-agent-wf ==     return self._agent_converter.create_dapr_agent(config, tools)
+== APP - oas-from-agent-wf ==            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-from-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/src/dapr_agents_oas_adapter/converters/agent.py", line 498, in create_dapr_agent
+== APP - oas-from-agent-wf ==     raise ConversionError(
+== APP - oas-from-agent-wf == dapr_agents_oas_adapter.converters.base.ConversionError: Failed to import Dapr Agents: cannot import name 'AssistantAgent' from 'dapr_agents' (/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/__init__.py). Make sure dapr-agents is installed.
+The App process exited with error code: exit status 1
+
+termination signal received: shutting down
+Error exiting App: exit status 1

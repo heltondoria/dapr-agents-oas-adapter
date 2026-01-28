@@ -9,6 +9,7 @@ from dapr_agents.workflow.decorators import llm_activity
 from dapr_agents.workflow.decorators.routers import message_router
 from pydantic import BaseModel, Field
 
+
 def _ensure_repo_root_on_sys_path() -> None:
     """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
     anchor = Path(__file__).resolve()

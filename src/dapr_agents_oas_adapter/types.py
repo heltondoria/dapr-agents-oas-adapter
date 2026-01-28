@@ -119,12 +119,15 @@ class WorkflowDefinition:
 
     name: str
     description: str | None = None
+    flow_id: str | None = None
     tasks: list[WorkflowTaskDefinition] = field(default_factory=list)
     edges: list[WorkflowEdgeDefinition] = field(default_factory=list)
     start_node: str | None = None
     end_nodes: list[str] = field(default_factory=list)
     inputs: list[PropertySchema] = field(default_factory=list)
     outputs: list[PropertySchema] = field(default_factory=list)
+    # Optional subflows referenced by FlowNode/MapNode (keyed by flow id).
+    subflows: dict[str, "WorkflowDefinition"] = field(default_factory=dict)
 
 
 class DaprAgentConfig(BaseModel):

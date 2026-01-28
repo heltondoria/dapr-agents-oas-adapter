@@ -15,15 +15,20 @@ uv run python examples/to_oas/04-message-router-workflow/export_oas.py
 1) Start the app (subscriber + workflow runtime):
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/to_oas/04-message-router-workflow/resolve_resources.py)
-dapr run --app-id message-workflow --resources-path "$RESOURCES_DIR" -- python examples/to_oas/04-message-router-workflow/app.py
-rm -rf "$RESOURCES_DIR"
+cp secrets.json.template secrets.json
+# Edit `secrets.json` and set `openai-secrets.OPENAI_API_KEY`.
+
+dapr run -f examples/to_oas/04-message-router-workflow
 ```
 
 1) In another terminal, publish a message:
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/to_oas/04-message-router-workflow/resolve_resources.py)
-dapr run --app-id message-workflow-client --resources-path "$RESOURCES_DIR" -- python examples/to_oas/04-message-router-workflow/message_client.py
-rm -rf "$RESOURCES_DIR"
+dapr run -f examples/to_oas/04-message-router-workflow/dapr.client.yaml
+```
+
+Stop the server:
+
+```bash
+dapr stop -f examples/to_oas/04-message-router-workflow
 ```

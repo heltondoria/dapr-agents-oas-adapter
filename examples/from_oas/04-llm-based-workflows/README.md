@@ -17,7 +17,11 @@ uv run python examples/to_oas/04-llm-based-workflows/export_oas.py
 2) Run the imported workflow:
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/from_oas/04-llm-based-workflows/resolve_resources.py)
-dapr run --app-id oas-from-llm-wf --resources-path "$RESOURCES_DIR" -- python examples/from_oas/04-llm-based-workflows/app.py
-rm -rf "$RESOURCES_DIR"
+cp secrets.json.template secrets.json
+# Edit `secrets.json` and set `openai-secrets.OPENAI_API_KEY`.
+
+dapr run -f examples/from_oas/04-llm-based-workflows
+
+# Stop:
+dapr stop -f examples/from_oas/04-llm-based-workflows
 ```

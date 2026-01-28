@@ -1,0 +1,4 @@
+== APP - oas-from-message-workflow-client == INFO:publisher:payload: {'topic': 'AI Agents'}
+== APP - oas-from-message-workflow-client == INFO:publisher:publish attempt 1 → messagepubsub/blog.requests
+== APP - oas-from-message-workflow-client == INFO:publisher:published successfully
+Exited App successfully

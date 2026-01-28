@@ -1,5 +1,5 @@
 component_type: Agent
-id: agent_71c57eaf
+id: agent_32c5d784
 name: ItineraryAgent
 description: Expand a trip outline into a detailed itinerary.
 metadata: null
@@ -7,7 +7,7 @@ inputs: []
 outputs: []
 llm_config:
   component_type: VllmConfig
-  id: llm_09fbaa06
+  id: llm_a709d323
   name: default_llm
   description: null
   metadata: {}

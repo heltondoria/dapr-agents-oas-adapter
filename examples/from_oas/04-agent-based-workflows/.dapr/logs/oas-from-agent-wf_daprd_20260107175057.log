@@ -1,0 +1,85 @@
+Starting Dapr with id oas-from-agent-wf. HTTP Port: 43221. gRPC Port: 46717
+Checking if Dapr sidecar is listening on HTTP port 43221
+time="2026-01-07T17:50:57.834810692-03:00" level=info msg="Starting Dapr Runtime -- version 1.16.3 -- commit 08ccc4577dc702ca35116465ce0b7d7ee89f9b8e" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.834845551-03:00" level=info msg="Log level set to: info" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.83496952-03:00" level=warning msg="mTLS is disabled. Skipping certificate request and tls validation" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.security type=log ver=1.16.3
+time="2026-01-07T17:50:57.835256765-03:00" level=info msg="Enabled features: SchedulerReminders" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.835326734-03:00" level=info msg="metric spec: {\"enabled\":true}" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.diagnostics type=log ver=1.16.3
+time="2026-01-07T17:50:57.835351214-03:00" level=info msg="Using default latency distribution buckets: [1 2 3 4 5 6 8 10 13 16 20 25 30 40 50 65 80 100 130 160 200 250 300 400 500 650 800 1000 2000 5000 10000 20000 50000 100000]" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.diagnostics type=log ver=1.16.3
+time="2026-01-07T17:50:57.835446082-03:00" level=warning msg="The default value for 'spec.metric.http.increasedCardinality' will change to 'false' in Dapr 1.15 or later" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.diagnostics type=log ver=1.16.3
+time="2026-01-07T17:50:57.835646949-03:00" level=warning msg="A non-YAML resiliency file secrets.json was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.835655859-03:00" level=warning msg="A non-YAML resiliency file secrets.json.template was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.835932745-03:00" level=info msg="standalone mode configured" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.835950825-03:00" level=info msg="app id: oas-from-agent-wf" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.836033814-03:00" level=info msg="Dapr trace sampler initialized: ParentBased{root:AlwaysOnSampler,remoteParentSampled:AlwaysOnSampler,remoteParentNotSampled:AlwaysOffSampler,localParentSampled:AlwaysOnSampler,localParentNotSampled:AlwaysOffSampler}" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.836070443-03:00" level=info msg="metrics server started on 0.0.0.0:45049/" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.837034738-03:00" level=info msg="Connected and received scheduler hosts addresses: [localhost:50006]" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.scheduler.watchhosts type=log ver=1.16.3
+time="2026-01-07T17:50:57.837171186-03:00" level=info msg="Scheduler client initialized for address: localhost:50006" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.scheduler.clients type=log ver=1.16.3
+time="2026-01-07T17:50:57.837184626-03:00" level=info msg="Scheduler clients initialized" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.scheduler.clients type=log ver=1.16.3
+time="2026-01-07T17:50:57.837278745-03:00" level=info msg="local service entry announced: oas-from-agent-wf -> 192.168.68.124:37827" app_id=oas-from-agent-wf component="nr (mdns/v1)" instance=prime-desktop-1 scope=dapr.contrib type=log ver=1.16.3
+time="2026-01-07T17:50:57.837312594-03:00" level=info msg="Initialized name resolution to mdns" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.837363983-03:00" level=info msg="Loading components…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.837686529-03:00" level=warning msg="A non-YAML Component file secrets.json was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.837708998-03:00" level=warning msg="A non-YAML Component file secrets.json.template was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838048263-03:00" level=info msg="Component loaded: local-secret-store (secretstores.local.file/v1)" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.processor type=log ver=1.16.3
+time="2026-01-07T17:50:57.838069303-03:00" level=error msg="Error getting secret: secret openai-secrets not found" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.processor.secret type=log ver=1.16.3
+time="2026-01-07T17:50:57.838120532-03:00" level=error msg="Failed to init component openai (conversation.openai/v1): [INIT_COMPONENT_FAILURE]: initialization error occurred for openai (conversation.openai/v1): missing the OpenAI API key, set it in the OPENAI_API_KEY environment variable" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.processor type=log ver=1.16.3
+time="2026-01-07T17:50:57.838147742-03:00" level=warning msg="Error processing component, daprd will exit gracefully: process component openai error: [INIT_COMPONENT_FAILURE]: initialization error occurred for openai (conversation.openai/v1): [INIT_COMPONENT_FAILURE]: initialization error occurred for openai (conversation.openai/v1): missing the OpenAI API key, set it in the OPENAI_API_KEY environment variable" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.processor type=log ver=1.16.3
+time="2026-01-07T17:50:57.838172251-03:00" level=info msg="Waiting for all outstanding components to be processed…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838186581-03:00" level=info msg="All outstanding components processed" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838199941-03:00" level=info msg="Loading endpoints…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838294949-03:00" level=warning msg="A non-YAML HTTPEndpoint file secrets.json was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838306699-03:00" level=warning msg="A non-YAML HTTPEndpoint file secrets.json.template was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838437687-03:00" level=info msg="Waiting for all outstanding http endpoints to be processed…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838446207-03:00" level=info msg="All outstanding http endpoints processed" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838452727-03:00" level=info msg="Loading Declarative Subscriptions…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.838509146-03:00" level=warning msg="A non-YAML Subscription file secrets.json was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838518076-03:00" level=warning msg="A non-YAML Subscription file secrets.json.template was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838704693-03:00" level=warning msg="A non-YAML Subscription file secrets.json was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838713103-03:00" level=warning msg="A non-YAML Subscription file secrets.json.template was detected, it will not be loaded" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.loader.disk type=log ver=1.16.3
+time="2026-01-07T17:50:57.838842721-03:00" level=warning msg="App channel is not initialized. Did you configure an app-port?" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.channels type=log ver=1.16.3
+time="2026-01-07T17:50:57.83890277-03:00" level=info msg="gRPC server listening on TCP address: :46717" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.api type=log ver=1.16.3
+time="2026-01-07T17:50:57.83892002-03:00" level=info msg="Enabled gRPC tracing middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.api type=log ver=1.16.3
+time="2026-01-07T17:50:57.83893092-03:00" level=info msg="Enabled gRPC metrics middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.api type=log ver=1.16.3
+time="2026-01-07T17:50:57.838972199-03:00" level=info msg="Registering workflow engine for gRPC endpoint: [::]:46717" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.api type=log ver=1.16.3
+time="2026-01-07T17:50:57.838995789-03:00" level=info msg="API gRPC server is running on port 46717" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839024558-03:00" level=warning msg="The default value for 'spec.metric.http.increasedCardinality' will change to 'false' in Dapr 1.15 or later" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.839063388-03:00" level=info msg="Enabled max body size HTTP middleware with size 4194304 bytes" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.839074538-03:00" level=info msg="Enabled tracing HTTP middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.839082928-03:00" level=info msg="Enabled metrics HTTP middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.839260575-03:00" level=info msg="HTTP server listening on TCP address: :43221" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.839283645-03:00" level=info msg="HTTP server is running on port 43221" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839290314-03:00" level=info msg="The request body size parameter is: 4194304 bytes" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839319544-03:00" level=info msg="gRPC server listening on TCP address: :37827" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.internal type=log ver=1.16.3
+time="2026-01-07T17:50:57.839328214-03:00" level=info msg="Enabled gRPC tracing middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.internal type=log ver=1.16.3
+time="2026-01-07T17:50:57.839337274-03:00" level=info msg="Enabled gRPC metrics middleware" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.grpc.internal type=log ver=1.16.3
+time="2026-01-07T17:50:57.839359853-03:00" level=info msg="Internal gRPC server is running on :37827" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839393543-03:00" level=info msg="actors: state store is not configured - this is okay for clients but services with hosted actors will fail to initialize!" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839406673-03:00" level=info msg="Actor state store not configured - actor hosting disabled, but invocation enabled" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.actor type=log ver=1.16.3
+time="2026-01-07T17:50:57.839431522-03:00" level=info msg="dapr initialized. Status: Running. Init Elapsed 3ms" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839473932-03:00" level=info msg="Dapr is shutting down" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839492041-03:00" level=info msg="Shutting down component local-secret-store (secretstores.local.file/v1)" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839508411-03:00" level=info msg="Dapr runtime stopped" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+time="2026-01-07T17:50:57.839515541-03:00" level=info msg="stopping mDNS server for app id: oas-from-agent-wf" app_id=oas-from-agent-wf component="nr (mdns/v1)" instance=prime-desktop-1 scope=dapr.contrib type=log ver=1.16.3
+time="2026-01-07T17:50:57.839518861-03:00" level=info msg="Closing HTTP server [::]:43221…" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime.http type=log ver=1.16.3
+time="2026-01-07T17:50:57.840423367-03:00" level=fatal msg="Fatal error from runtime: process component openai error: [INIT_COMPONENT_FAILURE]: initialization error occurred for openai (conversation.openai/v1): [INIT_COMPONENT_FAILURE]: initialization error occurred for openai (conversation.openai/v1): missing the OpenAI API key, set it in the OPENAI_API_KEY environment variable" app_id=oas-from-agent-wf instance=prime-desktop-1 scope=dapr.runtime type=log ver=1.16.3
+The daprd process exited with error code: exit status 1
+Dapr sidecar is not listening on HTTP port: dial tcp 127.0.0.1:43221: connect: connection refused
+Checking if Dapr sidecar is listening on GRPC port 46717
+Dapr sidecar is not listening on GRPC port: dial tcp 127.0.0.1:46717: connect: connection refused
+Dapr sidecar might not be responding.
+Updating metadata for cliPID: 1538904
+Could not update sidecar metadata for cliPID: PUT http://127.0.0.1:43221/v1.0/metadata/cliPID giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/cliPID": dial tcp 127.0.0.1:43221: connect: connection refused
+Could not update sidecar metadata for run file path: PUT http://127.0.0.1:43221/v1.0/metadata/runTemplatePath giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/runTemplatePath": dial tcp 127.0.0.1:43221: connect: connection refused
+Could not update sidecar metadata for run template name: PUT http://127.0.0.1:43221/v1.0/metadata/runTemplateName giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/runTemplateName": dial tcp 127.0.0.1:43221: connect: connection refused
+Could not update sidecar metadata for app log file path: PUT http://127.0.0.1:43221/v1.0/metadata/appLogPath giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/appLogPath": dial tcp 127.0.0.1:43221: connect: connection refused
+Could not update sidecar metadata for dapr log file path: PUT http://127.0.0.1:43221/v1.0/metadata/daprdLogPath giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/daprdLogPath": dial tcp 127.0.0.1:43221: connect: connection refused
+Updating metadata for app command: uv run python app.py
+Could not update sidecar metadata for appCommand: PUT http://127.0.0.1:43221/v1.0/metadata/appCommand giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/appCommand": dial tcp 127.0.0.1:43221: connect: connection refused
+Updating metadata for appPID: 1545606
+Could not update sidecar metadata for appPID: PUT http://127.0.0.1:43221/v1.0/metadata/appPID giving up after 5 attempt(s): Put "http://127.0.0.1:43221/v1.0/metadata/appPID": dial tcp 127.0.0.1:43221: connect: connection refused
+You're up and running! Dapr logs will appear here.
+
+
+termination signal received: shutting down
+Error exiting Dapr: exit status 1

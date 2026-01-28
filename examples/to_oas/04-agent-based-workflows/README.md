@@ -15,7 +15,11 @@ uv run python examples/to_oas/04-agent-based-workflows/export_oas.py
 1) Run the workflow with Dapr:
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/to_oas/04-agent-based-workflows/resolve_resources.py)
-dapr run --app-id oas-to-agent-wf --resources-path "$RESOURCES_DIR" -- python examples/to_oas/04-agent-based-workflows/workflow_agents.py
-rm -rf "$RESOURCES_DIR"
+cp secrets.json.template secrets.json
+# Edit `secrets.json` and set `openai-secrets.OPENAI_API_KEY`.
+
+dapr run -f examples/to_oas/04-agent-based-workflows
+
+# Stop:
+dapr stop -f examples/to_oas/04-agent-based-workflows
 ```

@@ -1,5 +1,5 @@
 component_type: Agent
-id: agent_ba400a39
+id: agent_33be91af
 name: DestinationExtractor
 description: Extract the destination city from a user message.
 metadata: null
@@ -7,7 +7,7 @@ inputs: []
 outputs: []
 llm_config:
   component_type: VllmConfig
-  id: llm_13351d1d
+  id: llm_5ac50301
   name: default_llm
   description: null
   metadata: {}

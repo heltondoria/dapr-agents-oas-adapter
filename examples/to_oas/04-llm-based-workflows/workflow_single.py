@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
 
 import dapr.ext.workflow as wf
 from dapr.ext.workflow import DaprWorkflowContext
 from dapr_agents.llm.dapr import DaprChatClient
 from dapr_agents.workflow.decorators import llm_activity
-
-from pathlib import Path
 
 
 def _ensure_repo_root_on_sys_path() -> None:

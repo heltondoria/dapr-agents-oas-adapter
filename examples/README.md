@@ -14,5 +14,7 @@ This folder contains runnable examples that validate the adapter in real scenari
 - `uv sync --all-groups`
 - Dapr CLI + Docker
 - `dapr init`
-- `OPENAI_API_KEY` set in the environment (or a `.env` file inside the example directory)
+- OpenAI key configured via the local secret store template:
+  - copy `secrets.json.template` to `secrets.json`
+  - set `openai-secrets.OPENAI_API_KEY`
 

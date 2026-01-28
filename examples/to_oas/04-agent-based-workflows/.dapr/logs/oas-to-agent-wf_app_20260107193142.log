@@ -1,0 +1,94 @@
+== APP - oas-to-agent-wf == Traceback (most recent call last):
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/examples/to_oas/04-agent-based-workflows/workflow_agents.py", line 37, in <module>
+== APP - oas-to-agent-wf ==     llm = DaprChatClient(component_name="openai")
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/pydantic/main.py", line 250, in __init__
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+== APP - oas-to-agent-wf ==                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/pydantic/_internal/_model_construction.py", line 146, in wrapped_model_post_init
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     original_model_post_init(self, context)
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/llm/dapr/chat.py", line 97, in model_post_init
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     super().model_post_init(__context)
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/pydantic/_internal/_model_construction.py", line 146, in wrapped_model_post_init
+== APP - oas-to-agent-wf ==     original_model_post_init(self, context)
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/llm/dapr/client.py", line 151, in model_post_init
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     self._client = self.get_client()
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==                    ^^^^^^^^^^^^^^^^^
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/llm/dapr/client.py", line 164, in get_client
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     return DaprInferenceClient()
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==            ^^^^^^^^^^^^^^^^^^^^^
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr_agents/llm/dapr/client.py", line 16, in __init__
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==     self.dapr_client = DaprClient()
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf ==                        ^^^^^^^^^^^^
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr/clients/__init__.py", line 88, in __init__
+== APP - oas-to-agent-wf ==     super().__init__(address, interceptors, max_grpc_message_length, retry_policy)
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr/clients/grpc/client.py", line 148, in __init__
+== APP - oas-to-agent-wf ==     DaprHealth.wait_until_ready()
+== APP - oas-to-agent-wf ==   File "/home/heltoncosta/Documentos/projects/python/poc/dapr-agents-oas-adapter/.venv/lib/python3.12/site-packages/dapr/clients/health.py", line 47, in wait_until_ready
+== APP - oas-to-agent-wf ==     raise TimeoutError(f'Dapr health check timed out, after {timeout}.')
+== APP - oas-to-agent-wf == TimeoutError: Dapr health check timed out, after 60.0.
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+== APP - oas-to-agent-wf == Health check on http://127.0.0.1:46735/v1.0/healthz/outbound failed: [Errno 111] Connection refused
+The App process exited with error code: exit status 1
+
+termination signal received: shutting down
+Error exiting App: exit status 1

@@ -1,4 +1,4 @@
-## 04-message-router-workflow (from_oas)
+# 04-message-router-workflow (from_oas)
 
 This example **imports** the OAS YAML exported by:
 
@@ -14,19 +14,24 @@ Run these commands from the repository root (the folder containing `pyproject.to
 uv run python examples/to_oas/04-message-router-workflow/export_oas.py
 ```
 
-2) Start the app (subscriber + workflow runtime):
+1) Start the app (subscriber + workflow runtime):
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/from_oas/04-message-router-workflow/resolve_resources.py)
-dapr run --app-id oas-from-message-workflow --resources-path "$RESOURCES_DIR" -- python examples/from_oas/04-message-router-workflow/app.py
-rm -rf "$RESOURCES_DIR"
+cp secrets.json.template secrets.json
+# Edit `secrets.json` and set `openai-secrets.OPENAI_API_KEY`.
+
+dapr run -f examples/from_oas/04-message-router-workflow
 ```
 
-3) In another terminal, publish a message:
+1) In another terminal, publish a message:
 
 ```bash
-RESOURCES_DIR=$(uv run python examples/from_oas/04-message-router-workflow/resolve_resources.py)
-dapr run --app-id oas-from-message-workflow-client --resources-path "$RESOURCES_DIR" -- python examples/from_oas/04-message-router-workflow/message_client.py
-rm -rf "$RESOURCES_DIR"
+dapr run -f examples/from_oas/04-message-router-workflow/dapr.client.yaml
+```
+
+Stop the server:
+
+```bash
+dapr stop -f examples/from_oas/04-message-router-workflow
 ```
 

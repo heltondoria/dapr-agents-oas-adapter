@@ -9,6 +9,7 @@ import dapr.ext.workflow as wf
 from dapr.ext.workflow import DaprWorkflowContext
 from dapr_agents.workflow.decorators import agent_activity
 
+
 def _ensure_repo_root_on_sys_path() -> None:
     """Ensure the repo root (the folder containing `pyproject.toml`) is on sys.path."""
     anchor = Path(__file__).resolve()
