@@ -1,5 +1,8 @@
 """Tests for types module."""
 
+import pytest
+from pydantic import ValidationError
+
 from dapr_agents_oas_adapter.types import (
     DAPR_PROVIDER_TO_OAS_LLM,
     DAPR_TO_OAS_AGENT_TYPE,
@@ -223,3 +226,170 @@ class TestMappings:
         assert JSON_SCHEMA_TO_PYTHON["boolean"] is bool
         assert PYTHON_TO_JSON_SCHEMA[str] == "string"
         assert PYTHON_TO_JSON_SCHEMA[int] == "integer"
+
+
+class TestPydanticFeatures:
+    """Tests for Pydantic-specific features (RF-002 acceptance criteria)."""
+
+    def test_llm_client_config_model_json_schema(self) -> None:
+        """Verify LlmClientConfig generates valid JSON schema."""
+        schema = LlmClientConfig.model_json_schema()
+        assert schema["type"] == "object"
+        assert "provider" in schema["properties"]
+        assert "model_id" in schema["properties"]
+        assert "provider" in schema["required"]
+        assert "model_id" in schema["required"]
+
+    def test_llm_client_config_rejects_extra_fields(self) -> None:
+        """Verify LlmClientConfig rejects unknown fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            LlmClientConfig(
+                provider="openai",
+                model_id="gpt-4",
+                unknown_field="should_fail",  # type: ignore[call-arg]
+            )
+        assert "extra" in str(exc_info.value).lower()
+
+    def test_llm_client_config_requires_mandatory_fields(self) -> None:
+        """Verify LlmClientConfig enforces required fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            LlmClientConfig()  # type: ignore[call-arg]
+        errors = exc_info.value.errors()
+        field_names = [e["loc"][0] for e in errors]
+        assert "provider" in field_names
+        assert "model_id" in field_names
+
+    def test_tool_definition_model_json_schema(self) -> None:
+        """Verify ToolDefinition generates valid JSON schema."""
+        schema = ToolDefinition.model_json_schema()
+        # Schema may have $defs for complex types
+        props = schema.get("properties", {})
+        required = schema.get("required", [])
+        assert "name" in props
+        assert "description" in props
+        assert "name" in required
+        assert "description" in required
+
+    def test_tool_definition_rejects_extra_fields(self) -> None:
+        """Verify ToolDefinition rejects unknown fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            ToolDefinition(
+                name="test",
+                description="test",
+                extra_field="should_fail",  # type: ignore[call-arg]
+            )
+        assert "extra" in str(exc_info.value).lower()
+
+    def test_workflow_task_definition_model_json_schema(self) -> None:
+        """Verify WorkflowTaskDefinition generates valid JSON schema."""
+        schema = WorkflowTaskDefinition.model_json_schema()
+        assert schema["type"] == "object"
+        assert "name" in schema["properties"]
+        assert "task_type" in schema["properties"]
+        assert "name" in schema["required"]
+        assert "task_type" in schema["required"]
+
+    def test_workflow_edge_definition_model_json_schema(self) -> None:
+        """Verify WorkflowEdgeDefinition generates valid JSON schema."""
+        schema = WorkflowEdgeDefinition.model_json_schema()
+        assert schema["type"] == "object"
+        assert "from_node" in schema["properties"]
+        assert "to_node" in schema["properties"]
+        assert "from_node" in schema["required"]
+        assert "to_node" in schema["required"]
+
+    def test_workflow_definition_model_json_schema(self) -> None:
+        """Verify WorkflowDefinition generates valid JSON schema."""
+        schema = WorkflowDefinition.model_json_schema()
+        # Schema uses $defs for recursive types; look in the right place
+        if "$defs" in schema and "WorkflowDefinition" in schema["$defs"]:
+            props = schema["$defs"]["WorkflowDefinition"].get("properties", {})
+            required = schema["$defs"]["WorkflowDefinition"].get("required", [])
+        else:
+            props = schema.get("properties", {})
+            required = schema.get("required", [])
+        assert "name" in props
+        assert "tasks" in props
+        assert "edges" in props
+        assert "name" in required
+
+    def test_workflow_definition_nested_validation(self) -> None:
+        """Verify WorkflowDefinition validates nested models."""
+        # Valid nested structure
+        workflow = WorkflowDefinition(
+            name="test",
+            tasks=[WorkflowTaskDefinition(name="t1", task_type="llm")],
+            edges=[WorkflowEdgeDefinition(from_node="t1", to_node="t2")],
+        )
+        assert len(workflow.tasks) == 1
+        assert len(workflow.edges) == 1
+
+    def test_dapr_agent_config_model_json_schema(self) -> None:
+        """Verify DaprAgentConfig generates valid JSON schema."""
+        schema = DaprAgentConfig.model_json_schema()
+        assert schema["type"] == "object"
+        assert "name" in schema["properties"]
+        assert "role" in schema["properties"]
+        assert "instructions" in schema["properties"]
+        assert "name" in schema["required"]
+
+    def test_dapr_agent_config_rejects_extra_fields(self) -> None:
+        """Verify DaprAgentConfig rejects unknown fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            DaprAgentConfig(
+                name="test",
+                unknown_field="should_fail",  # type: ignore[call-arg]
+            )
+        assert "extra" in str(exc_info.value).lower()
+
+    def test_model_serialization_roundtrip(self) -> None:
+        """Verify models can be serialized and deserialized."""
+        original = WorkflowDefinition(
+            name="roundtrip_test",
+            description="Test roundtrip serialization",
+            tasks=[
+                WorkflowTaskDefinition(
+                    name="task1",
+                    task_type="llm",
+                    config={"prompt": "Hello"},
+                )
+            ],
+            edges=[
+                WorkflowEdgeDefinition(
+                    from_node="start",
+                    to_node="task1",
+                    from_branch="yes",
+                )
+            ],
+            start_node="start",
+            end_nodes=["end"],
+        )
+        # Serialize to dict
+        data = original.model_dump()
+        # Deserialize back
+        restored = WorkflowDefinition.model_validate(data)
+
+        assert restored.name == original.name
+        assert restored.description == original.description
+        assert len(restored.tasks) == len(original.tasks)
+        assert restored.tasks[0].name == original.tasks[0].name
+        assert len(restored.edges) == len(original.edges)
+        assert restored.edges[0].from_branch == original.edges[0].from_branch
+
+    def test_model_json_roundtrip(self) -> None:
+        """Verify models can be serialized to JSON and back."""
+        original = LlmClientConfig(
+            provider="openai",
+            model_id="gpt-4",
+            temperature=0.5,
+            extra_params={"top_p": 0.9},
+        )
+        # Serialize to JSON
+        json_str = original.model_dump_json()
+        # Deserialize back
+        restored = LlmClientConfig.model_validate_json(json_str)
+
+        assert restored.provider == original.provider
+        assert restored.model_id == original.model_id
+        assert restored.temperature == original.temperature
+        assert restored.extra_params == original.extra_params

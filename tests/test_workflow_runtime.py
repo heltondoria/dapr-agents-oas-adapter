@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,15 +35,33 @@ class DummyWorkflowContext:
         self.is_replaying = False
         self.calls: list[tuple[str, Any, Any, Any]] = []
 
-    def call_activity(self, activity: Any, input: dict | None = None, retry_policy: Any = None) -> DummyTask:
+    def call_activity(
+        self,
+        activity: Any,
+        input: dict | None = None,  # noqa: A002 - matches Dapr SDK signature
+        retry_policy: Any = None,
+    ) -> DummyTask:
         self.calls.append(("activity", activity.__name__, input, retry_policy))
-        return DummyTask(kind="activity", name=activity.__name__, payload=input, retry_policy=retry_policy)
+        return DummyTask(
+            kind="activity",
+            name=activity.__name__,
+            payload=input,
+            retry_policy=retry_policy,
+        )
 
     def call_child_workflow(
-        self, workflow_name: str, input: dict | None = None, retry_policy: Any = None
+        self,
+        workflow_name: str,
+        input: dict | None = None,  # noqa: A002 - matches Dapr SDK signature
+        retry_policy: Any = None,
     ) -> DummyTask:
         self.calls.append(("child", workflow_name, input, retry_policy))
-        return DummyTask(kind="child", name=workflow_name, payload=input, retry_policy=retry_policy)
+        return DummyTask(
+            kind="child",
+            name=workflow_name,
+            payload=input,
+            retry_policy=retry_policy,
+        )
 
     def create_timer(self, delta: Any) -> DummyTask:
         return DummyTask(kind="timer", payload=delta)
@@ -88,7 +107,13 @@ def workflow_stubs(monkeypatch):
     return wf
 
 
-def _make_handler(ctx: DummyWorkflowContext, *, activity_results=None, child_results=None, fail_on=None):
+def _make_handler(
+    ctx: DummyWorkflowContext,
+    *,
+    activity_results: dict[str, Any] | None = None,
+    child_results: dict[str, Any] | None = None,
+    fail_on: set[str] | list[str] | None = None,
+) -> Callable[[Any], Any]:
     activity_results = activity_results or {}
     child_results = child_results or {}
     fail_on = set(fail_on or [])
