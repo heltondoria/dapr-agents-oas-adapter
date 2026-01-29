@@ -37,7 +37,9 @@ def _build_blog_workflow_definition() -> WorkflowDefinition:
                 name="write_post",
                 task_type="llm",
                 config={
-                    "prompt_template": "Write a short blog post following this outline:\n{{ outline }}"
+                    "prompt_template": (
+                        "Write a short blog post following this outline:\n{{ outline }}"
+                    )
                 },
                 inputs=["outline"],
                 outputs=["post"],

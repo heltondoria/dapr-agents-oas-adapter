@@ -24,6 +24,7 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
+
 def _load_workflow_yaml() -> WorkflowDefinition:
     from examples._shared.paths import find_repo_root
 
