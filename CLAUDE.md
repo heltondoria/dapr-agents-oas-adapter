@@ -30,6 +30,10 @@ uv run ty check                   # Type check (replaces mypy/pyright)
 # Code Quality
 uv run codespell .                # Spell check
 uv run vulture .                  # Dead code detection
+
+# Documentation
+uv run mkdocs build               # Build documentation
+uv run mkdocs serve               # Serve docs locally at http://127.0.0.1:8000
 ```
 
 ## Architecture
