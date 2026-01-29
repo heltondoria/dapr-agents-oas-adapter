@@ -1,49 +1,99 @@
 # Agent Build Instructions
 
+## Project Overview
+
+**dapr-agents-oas-adapter** is a Python library enabling bidirectional conversion between [Open Agent Spec (OAS)](https://oracle.github.io/agent-spec/) and [Dapr Agents](https://docs.dapr.io/developing-applications/dapr-agents/).
+
 ## Project Setup
 ```bash
-# Install dependencies (example for Node.js project)
-npm install
-
-# Or for Python project
-pip install -r requirements.txt
-
-# Or for Rust project  
-cargo build
+# Install all dependencies including dev groups
+uv sync --all-groups
 ```
 
 ## Running Tests
 ```bash
-# Node.js
-npm test
+# Run all tests
+uv run pytest
 
-# Python
-pytest
+# Run tests with verbose output
+uv run pytest -v
 
-# Rust
-cargo test
+# Run tests with coverage (100% required)
+uv run pytest --cov=src/dapr_agents_oas_adapter --cov-report=term-missing --cov-fail-under=100
+
+# Run specific test file
+uv run pytest tests/test_converters.py
+
+# Run specific test by name
+uv run pytest -k "test_branching_selects"
 ```
 
-## Build Commands
+## Quality Gates (ALL MUST PASS)
+
+### Linting & Formatting
 ```bash
-# Production build
-npm run build
-# or
-cargo build --release
+# Lint code with ruff
+uv run ruff check .
+
+# Auto-fix lint issues
+uv run ruff check --fix .
+
+# Format code (PEP8)
+uv run ruff format .
+
+# Check formatting without changes
+uv run ruff format --check .
 ```
 
-## Development Server
+### Type Checking
 ```bash
-# Start development server
-npm run dev
-# or
-cargo run
+# Type check with mypy (strict mode)
+uv run mypy src/ --strict
+
+# Type check with pyright (cross-validation)
+uv run pyright src/
+
+# Optional: fast local feedback with ty
+uv run ty check
+```
+
+### Code Quality Analysis
+```bash
+# Dead code detection
+uv run vulture src/ --min-confidence 90
+
+# Duplicate code detection (pylint similarity checker only)
+uv run pylint --disable=all --enable=R0801 src/
+
+# Complexity metrics (report)
+uv run radon cc src/ -a
+
+# Complexity gate (must be Grade A)
+uv run xenon src/ --max-absolute A --max-modules A --max-average A
+
+# Spell check
+uv run codespell .
+```
+
+### Full Quality Check (CI Pipeline)
+```bash
+# Run all quality gates in sequence
+uv run ruff check . && \
+uv run ruff format --check . && \
+uv run mypy src/ --strict && \
+uv run pyright src/ && \
+uv run vulture src/ --min-confidence 90 && \
+uv run pylint --disable=all --enable=R0801 src/ && \
+uv run xenon src/ --max-absolute A --max-modules A --max-average A && \
+uv run pytest --cov=src/dapr_agents_oas_adapter --cov-fail-under=100
 ```
 
 ## Key Learnings
-- Update this section when you learn new build optimizations
-- Document any gotchas or special setup requirements
-- Keep track of the fastest test/build cycle
+- FlowConverter.create_dapr_workflow() is complex (~350 lines) - decomposition planned (RF-004)
+- Version inconsistency exists between __init__.py and pyproject.toml - fix planned (RF-001)
+- Mixed data models (Pydantic + dataclasses) - unification planned (RF-002)
+- Template system uses `{{ variable }}` syntax for prompts
+- Subflows must be registered BEFORE parent workflows
 
 ## Feature Development Quality Standards
 
@@ -51,18 +101,20 @@ cargo run
 
 ### Testing Requirements
 
-- **Minimum Coverage**: 85% code coverage ratio required for all new code
+- **Minimum Coverage**: 100% code coverage ratio required for all new code
 - **Test Pass Rate**: 100% - all tests must pass, no exceptions
 - **Test Types Required**:
-  - Unit tests for all business logic and services
-  - Integration tests for API endpoints or main functionality
-  - End-to-end tests for critical user workflows
+  - Unit tests for all converters, loaders, and exporters
+  - Integration tests for all conversion paths (OAS→Dapr, Dapr→OAS)
+  - Edge case tests for error handling, boundary conditions
+  - Roundtrip tests ensuring no data loss in conversions
 - **Coverage Validation**: Run coverage reports before marking features complete:
   ```bash
-  # Examples by language/framework
-  npm run test:coverage
-  pytest --cov=src tests/ --cov-report=term-missing
-  cargo tarpaulin --out Html
+  # Run with coverage report
+  uv run pytest --cov=src/dapr_agents_oas_adapter --cov-report=term-missing --cov-fail-under=100
+
+  # Generate HTML coverage report
+  uv run pytest --cov=src/dapr_agents_oas_adapter --cov-report=html
   ```
 - **Test Quality**: Tests must validate behavior, not just achieve coverage metrics
 - **Test Documentation**: Complex test scenarios must include comments explaining the test strategy
@@ -74,10 +126,10 @@ Before moving to the next feature, ALL changes must be:
 1. **Committed with Clear Messages**:
    ```bash
    git add .
-   git commit -m "feat(module): descriptive message following conventional commits"
+   git commit -m "feat(converters): descriptive message following conventional commits"
    ```
    - Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, etc.
-   - Include scope when applicable: `feat(api):`, `fix(ui):`, `test(auth):`
+   - Include scope when applicable: `feat(flow):`, `fix(loader):`, `test(agent):`
    - Write descriptive messages that explain WHAT changed and WHY
 
 2. **Pushed to Remote Repository**:
@@ -86,15 +138,15 @@ Before moving to the next feature, ALL changes must be:
    ```
    - Never leave completed features uncommitted
    - Push regularly to maintain backup and enable collaboration
-   - Ensure CI/CD pipelines pass before considering feature complete
+   - Ensure all quality gates pass before considering feature complete
 
 3. **Branch Hygiene**:
    - Work on feature branches, never directly on `main`
-   - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
+   - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `refactor/<rf-xxx>`
    - Create pull requests for all significant changes
 
 4. **Ralph Integration**:
-   - Update .ralph/fix_plan.md with new tasks before starting work
+   - Follow RF-xxx items from .ralph/fix_plan.md in dependency order
    - Mark items complete in .ralph/fix_plan.md upon completion
    - Update .ralph/PROMPT.md if development patterns change
    - Test features work within Ralph's autonomous loop
@@ -130,20 +182,21 @@ Before moving to the next feature, ALL changes must be:
 
 Before marking ANY feature as complete, verify:
 
-- [ ] All tests pass with appropriate framework command
-- [ ] Code coverage meets 85% minimum threshold
-- [ ] Coverage report reviewed for meaningful test quality
-- [ ] Code formatted according to project standards
-- [ ] Type checking passes (if applicable)
+- [ ] All tests pass: `uv run pytest`
+- [ ] Code coverage at 100%: `uv run pytest --cov=src/dapr_agents_oas_adapter --cov-fail-under=100`
+- [ ] Ruff lint passes: `uv run ruff check .`
+- [ ] Ruff format passes: `uv run ruff format --check .`
+- [ ] mypy strict passes: `uv run mypy src/ --strict`
+- [ ] pyright passes: `uv run pyright src/`
+- [ ] No duplicate code: `uv run pylint --disable=all --enable=R0801 src/`
+- [ ] No dead code: `uv run vulture src/ --min-confidence 90`
+- [ ] Complexity Grade A: `uv run xenon src/ --max-absolute A --max-modules A --max-average A`
 - [ ] All changes committed with conventional commit messages
 - [ ] All commits pushed to remote repository
 - [ ] .ralph/fix_plan.md task marked as complete
-- [ ] Implementation documentation updated
-- [ ] Inline code comments updated or added
+- [ ] Implementation documentation updated (if API changed)
 - [ ] .ralph/AGENT.md updated (if new patterns introduced)
-- [ ] Breaking changes documented
-- [ ] Features tested within Ralph loop (if applicable)
-- [ ] CI/CD pipeline passes
+- [ ] Breaking changes documented in PRD.md changelog
 
 ### Rationale
 
