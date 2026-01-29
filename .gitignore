@@ -78,3 +78,8 @@ dmypy.json
 .cursor
 secrets.json
 **/components/secrets.json
+.ralph/logs
+.ralph/status.json
+.ralph/.call_count
+.ralph/progress.json
+.ralph/.circuit_breaker_history
