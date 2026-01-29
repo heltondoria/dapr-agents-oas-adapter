@@ -246,6 +246,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             raise ConversionError(
                 f"No implementation found for tool: {tool_def.name}",
                 tool_def,
+                suggestion="Provide an implementation via tool_def.implementation or tool_registry",
             )
 
         # Wrap with metadata for Dapr

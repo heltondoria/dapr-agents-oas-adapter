@@ -2,7 +2,6 @@
 
 import json
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
 
 from pyagentspec import Component, Property  # noqa: F401
@@ -18,6 +17,14 @@ from dapr_agents_oas_adapter.converters.base import (
     ConversionError,
 )
 from dapr_agents_oas_adapter.converters.node import NodeConverter
+from dapr_agents_oas_adapter.converters.workflow_helpers import (
+    ActivityStubManager,
+    BranchRouter,
+    CompensationHandler,
+    RetryPolicyBuilder,
+    TaskExecutor,
+)
+from dapr_agents_oas_adapter.logging import get_logger
 from dapr_agents_oas_adapter.types import (
     NamedCallable,
     ToolRegistry,
@@ -385,30 +392,26 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         try:
             import dapr.ext.workflow as wf
         except Exception as e:
-            raise ConversionError(f"Failed to import Dapr workflow SDK: {e}", workflow_def) from e
+            raise ConversionError(
+                "Failed to import Dapr workflow SDK",
+                workflow_def,
+                suggestion="Install dapr-ext-workflow: pip install dapr-ext-workflow",
+                caused_by=e,
+            ) from e
 
         try:
             visited_workflows = _visited_workflows or set()
             flow_key = workflow_def.flow_id or workflow_def.name
             visited_workflows.add(flow_key)
 
-            def _make_activity_stub(name: str) -> Callable[[Any, Any], Any]:
-                """Create a callable placeholder used only to reference an activity by name."""
+            # Initialize helper classes
+            stub_manager = ActivityStubManager()
+            retry_builder = RetryPolicyBuilder(wf)
+            branch_router = BranchRouter()
+            compensation_handler = CompensationHandler()
+            task_executor = TaskExecutor(wf, retry_builder, stub_manager, task_implementations)
 
-                def _activity(_: Any, __: Any = None) -> Any:  # pragma: no cover
-                    raise RuntimeError("This stub should never be executed directly.")
-
-                _activity.__name__ = name
-                _activity.__qualname__ = name
-                return _activity
-
-            activity_stubs: dict[str, Callable[[Any, Any], Any]] = {}
-
-            def _get_activity_stub(name: str) -> Callable[[Any, Any], Any]:
-                if name not in activity_stubs:
-                    activity_stubs[name] = _make_activity_stub(name)
-                return activity_stubs[name]
-
+            # Build task and edge lookups
             tasks_by_name: dict[str, WorkflowTaskDefinition] = {
                 task.name: task for task in workflow_def.tasks
             }
@@ -418,226 +421,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 outgoing_edges.setdefault(edge.from_node, []).append(edge)
                 incoming_edges.setdefault(edge.to_node, []).append(edge)
 
-            def _is_default_branch(branch: str | None) -> bool:
-                if branch is None:
-                    return True
-                return branch.strip().lower() in ("", "default", "next")
-
-            def _extract_branch_value(task: WorkflowTaskDefinition, result: Any) -> str | None:
-                key = task.config.get("branch_output_key")
-                if key and isinstance(result, dict) and key in result:
-                    value = result.get(key)
-                    return str(value) if value is not None else None
-                if isinstance(result, dict):
-                    for candidate in ("branch", "branch_name", "__branch__"):
-                        if candidate in result:
-                            value = result.get(candidate)
-                            return str(value) if value is not None else None
-                if isinstance(result, str):
-                    return result
-                return None
-
-            def _select_next_edges(
-                task: WorkflowTaskDefinition, result: Any
-            ) -> list[WorkflowEdgeDefinition]:
-                edges = outgoing_edges.get(task.name, [])
-                if not edges:
-                    return []
-                has_branches = any(edge.from_branch for edge in edges)
-                if not has_branches:
-                    return edges
-                branch_value = _extract_branch_value(task, result)
-                if branch_value is not None:
-                    matching = [e for e in edges if e.from_branch == branch_value]
-                    if matching:
-                        return matching
-                default_edges = [e for e in edges if _is_default_branch(e.from_branch)]
-                return default_edges if default_edges else []
-
-            def _build_retry_policy(config: dict[str, Any]) -> Any | None:
-                if not hasattr(wf, "RetryPolicy"):
-                    return None
-                retry_config = config.get("retry_policy")
-                if retry_config is None:
-                    return None
-                if hasattr(retry_config, "max_attempts"):
-                    max_attempts = getattr(retry_config, "max_attempts", 1)
-                    initial_backoff = getattr(retry_config, "initial_backoff_seconds", 5)
-                    max_backoff = getattr(retry_config, "max_backoff_seconds", 30)
-                    multiplier = getattr(retry_config, "backoff_multiplier", 1.5)
-                    retry_timeout = getattr(retry_config, "retry_timeout", None)
-                elif isinstance(retry_config, dict):
-                    max_attempts = retry_config.get("max_attempts", 1)
-                    initial_backoff = retry_config.get("initial_backoff_seconds", 5)
-                    max_backoff = retry_config.get("max_backoff_seconds", 30)
-                    multiplier = retry_config.get("backoff_multiplier", 1.5)
-                    retry_timeout = retry_config.get("retry_timeout")
-                else:
-                    return None
-                return wf.RetryPolicy(
-                    max_number_of_attempts=max_attempts,
-                    first_retry_interval=timedelta(seconds=initial_backoff),
-                    max_retry_interval=timedelta(seconds=max_backoff),
-                    backoff_coefficient=multiplier,
-                    retry_timeout=timedelta(seconds=retry_timeout)
-                    if retry_timeout
-                    else None,
-                )
-
-            def _call_activity(
-                ctx: Any, activity: Callable[[Any, Any], Any], input_data: dict[str, Any], retry: Any
-            ) -> Any:
-                kwargs: dict[str, Any] = {"input": input_data}
-                if retry is not None:
-                    kwargs["retry_policy"] = retry
-                try:
-                    return ctx.call_activity(activity, **kwargs)
-                except TypeError:
-                    kwargs.pop("retry_policy", None)
-                    return ctx.call_activity(activity, **kwargs)
-
-            def _call_child_workflow(
-                ctx: Any, workflow_name: str, input_data: dict[str, Any], retry: Any
-            ) -> Any:
-                if not hasattr(ctx, "call_child_workflow"):
-                    raise RuntimeError("call_child_workflow is not available in this SDK.")
-                kwargs: dict[str, Any] = {"input": input_data}
-                if retry is not None:
-                    kwargs["retry_policy"] = retry
-                try:
-                    return ctx.call_child_workflow(workflow_name, **kwargs)
-                except TypeError:
-                    kwargs.pop("retry_policy", None)
-                    return ctx.call_child_workflow(workflow_name, **kwargs)
-
-            def _await_with_timeout(
-                ctx: Any, task_obj: Any, timeout_seconds: int | None
-            ) -> Any:
-                if not timeout_seconds or not hasattr(ctx, "create_timer"):
-                    return (yield task_obj)
-                timeout_task = ctx.create_timer(timedelta(seconds=timeout_seconds))
-                winner = yield wf.when_any([task_obj, timeout_task])
-                if winner == timeout_task:
-                    raise TimeoutError("Task execution timed out.")
-                return (yield task_obj)
-
-            def _resolve_flow_name(task: WorkflowTaskDefinition, key: str) -> str:
-                config_value = task.config.get(key) or task.config.get("flow_name")
-                if config_value:
-                    return str(config_value)
-                config_value = task.config.get("flow_id") or task.config.get("inner_flow_id")
-                if config_value:
-                    return str(config_value)
-                return task.name
-
-            def _extract_map_items(task: WorkflowTaskDefinition, task_input: dict[str, Any]) -> list[Any]:
-                map_key = task.config.get("map_input_key") or "items"
-                if map_key in task_input:
-                    items = task_input.get(map_key)
-                elif len(task.inputs) == 1 and task.inputs[0] in task_input:
-                    items = task_input.get(task.inputs[0])
-                else:
-                    items = task_input.get("items")
-                if not isinstance(items, list):
-                    raise ValueError(f"MapNode '{task.name}' expects a list for '{map_key}'.")
-                return items
-
-            def _build_map_item_input(
-                task: WorkflowTaskDefinition, task_input: dict[str, Any], item: Any
-            ) -> dict[str, Any]:
-                map_key = task.config.get("map_input_key") or "items"
-                item_key = task.config.get("map_item_key") or "item"
-                base = {k: v for k, v in task_input.items() if k != map_key}
-                if isinstance(item, dict):
-                    return {**base, **item}
-                return {**base, item_key: item}
-
-            def _get_compensation_activity(task: WorkflowTaskDefinition) -> str | None:
-                for key in ("compensation_activity", "compensating_activity", "compensation_task"):
-                    if key in task.config:
-                        return str(task.config[key])
-                on_error = task.config.get("on_error")
-                if isinstance(on_error, dict):
-                    for key in ("compensation_activity", "compensation_task", "activity"):
-                        if key in on_error:
-                            return str(on_error[key])
-                return None
-
-            def _execute_compensations(
-                ctx: Any,
-                executed: list[str],
-                results: dict[str, Any],
-                error: Exception,
-            ) -> Any:
-                for task_name in reversed(executed):
-                    task = tasks_by_name.get(task_name)
-                    if not task:
-                        continue
-                    compensation = _get_compensation_activity(task)
-                    if not compensation:
-                        continue
-                    payload = {
-                        "task": task_name,
-                        "error": str(error),
-                        "result": results.get(task_name),
-                    }
-                    extra = task.config.get("compensation_input")
-                    if isinstance(extra, dict):
-                        payload.update(extra)
-                    try:
-                        yield _call_activity(ctx, _get_activity_stub(compensation), payload, None)
-                    except Exception:
-                        continue
-
-            def _execute_task(
-                ctx: Any, task: WorkflowTaskDefinition, task_input: dict[str, Any]
-            ) -> Any:
-                timeout_seconds = task.config.get("timeout_seconds")
-                retry_policy = _build_retry_policy(task.config)
-                if task_implementations and task.name in task_implementations:
-                    impl = task_implementations[task.name]
-                    return impl(**task_input)
-
-                if task.task_type == "flow":
-                    workflow_name = _resolve_flow_name(task, "flow_name")
-                    if hasattr(ctx, "call_child_workflow"):
-                        task_obj = _call_child_workflow(ctx, workflow_name, task_input, retry_policy)
-                        return (yield from _await_with_timeout(ctx, task_obj, timeout_seconds))
-                    activity = _get_activity_stub(task.name)
-                    task_obj = _call_activity(ctx, activity, task_input, retry_policy)
-                    return (yield from _await_with_timeout(ctx, task_obj, timeout_seconds))
-
-                if task.task_type == "map":
-                    items = _extract_map_items(task, task_input)
-                    parallel = bool(task.config.get("parallel", True))
-                    workflow_name = _resolve_flow_name(task, "inner_flow_id")
-                    if hasattr(ctx, "call_child_workflow"):
-                        tasks = [
-                            _call_child_workflow(
-                                ctx,
-                                workflow_name,
-                                _build_map_item_input(task, task_input, item),
-                                retry_policy,
-                            )
-                            for item in items
-                        ]
-                        if parallel:
-                            if timeout_seconds:
-                                all_task = wf.when_all(tasks)
-                                return (yield from _await_with_timeout(ctx, all_task, timeout_seconds))
-                            return (yield wf.when_all(tasks))
-                        results_list = []
-                        for t in tasks:
-                            results_list.append((yield from _await_with_timeout(ctx, t, timeout_seconds)))
-                        return results_list
-                    activity = _get_activity_stub(task.name)
-                    task_obj = _call_activity(ctx, activity, task_input, retry_policy)
-                    return (yield from _await_with_timeout(ctx, task_obj, timeout_seconds))
-
-                activity = _get_activity_stub(task.name)
-                task_obj = _call_activity(ctx, activity, task_input, retry_policy)
-                return (yield from _await_with_timeout(ctx, task_obj, timeout_seconds))
-
+            # Build child workflows for subflows
             child_workflows: list[NamedCallable] = []
             for subflow_def in workflow_def.subflows.values():
                 subflow_key = subflow_def.flow_id or subflow_def.name
@@ -650,6 +434,20 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         _visited_workflows=visited_workflows,
                     )
                 )
+
+            def _call_compensation_activity(
+                ctx: Any, activity_name: str, payload: dict[str, Any], retry: Any
+            ) -> Any:
+                """Helper for compensation handler to call activities."""
+                activity = stub_manager.get_stub(activity_name)
+                kwargs: dict[str, Any] = {"input": payload}
+                if retry is not None:
+                    kwargs["retry_policy"] = retry
+                try:
+                    return ctx.call_activity(activity, **kwargs)
+                except TypeError:
+                    kwargs.pop("retry_policy", None)
+                    return ctx.call_activity(activity, **kwargs)
 
             def workflow_function(ctx: Any, input_params: dict[str, Any]) -> Any:
                 """Generated Dapr workflow function."""
@@ -666,13 +464,12 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                     if edge.to_node not in pending_queue:
                         pending_queue.append(edge.to_node)
 
-                # Seed with start node outputs.
+                # Seed with start node outputs
                 if workflow_def.start_node:
                     results[workflow_def.start_node] = input_params
                     for edge in outgoing_edges.get(workflow_def.start_node, []):
                         _enqueue_edge(edge)
                 else:
-                    # If no explicit start node, schedule nodes with no incoming edges.
                     for task_name in tasks_by_name:
                         if task_name not in incoming_edges:
                             pending_queue.append(task_name)
@@ -685,35 +482,45 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         task = tasks_by_name.get(task_name)
                         if not task:
                             continue
+
                         edges_for_task = pending_inputs.pop(task_name, [])
                         task_input = self._build_task_input(task, results, edges_for_task)
 
-                        if task.task_type == "start" or task.task_type == "end":
+                        if task.task_type in ("start", "end"):
                             results[task_name] = task_input
                         else:
-                            result = yield from _execute_task(ctx, task, task_input)
+                            result = yield from task_executor.execute(ctx, task, task_input)
                             results[task_name] = result
 
                         executed.append(task_name)
                         executed_set.add(task_name)
 
-                        next_edges = _select_next_edges(task, results.get(task_name))
+                        next_edges = branch_router.select_next_edges(
+                            task.name, task.config, results.get(task_name), outgoing_edges
+                        )
                         for edge in next_edges:
                             _enqueue_edge(edge)
                 except Exception as exc:
-                    yield from _execute_compensations(ctx, executed, results, exc)
+                    yield from compensation_handler.execute_compensations(
+                        ctx, executed, results, tasks_by_name, exc, _call_compensation_activity
+                    )
                     raise
 
                 return self._build_workflow_output(workflow_def, results)
 
             workflow_function.__name__ = workflow_def.name
             workflow_function.__doc__ = workflow_def.description or f"Workflow: {workflow_def.name}"
-            workflow_function.child_workflows = child_workflows
+            workflow_function.child_workflows = child_workflows  # type: ignore[attr-defined]
 
             return workflow_function
 
         except Exception as e:
-            raise ConversionError(f"Failed to create Dapr workflow: {e}", workflow_def) from e
+            raise ConversionError(
+                "Failed to create Dapr workflow",
+                workflow_def,
+                suggestion="Check workflow definition for invalid task types or edge references",
+                caused_by=e,
+            ) from e
 
     def generate_workflow_code(self, workflow_def: WorkflowDefinition) -> str:
         """Generate Python code for a Dapr workflow.
@@ -899,7 +706,13 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 continue
             try:
                 subflow_def = self.from_dict(component, _visited_flows=visited_flows)
-            except Exception:
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning(
+                    "Failed to parse subflow",
+                    flow_id=comp_id,
+                    error=str(e),
+                )
                 continue
             subflows[comp_id] = subflow_def
         return subflows
@@ -956,7 +769,11 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         results: dict[str, Any],
         edges: list[WorkflowEdgeDefinition],
     ) -> dict[str, Any]:
-        """Build input for a task from selected edges."""
+        """Build input for a task from selected edges.
+
+        For end nodes without explicit data_mapping, propagate all source results
+        to ensure workflow output captures the final state.
+        """
         task_input: dict[str, Any] = {}
 
         for edge in edges:
@@ -971,9 +788,15 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 if not isinstance(source_result, dict):
                     # Normalize scalar results (e.g., str) so they can be mapped.
                     source_result = {"result": source_result}
-                for source_key, dest_key in edge.data_mapping.items():
-                    if isinstance(source_result, dict) and source_key in source_result:
-                        task_input[dest_key] = source_result[source_key]
+
+                # For end nodes without data_mapping, propagate all source results
+                if task.task_type == "end" and not edge.data_mapping:
+                    if isinstance(source_result, dict):
+                        task_input.update(source_result)
+                else:
+                    for source_key, dest_key in edge.data_mapping.items():
+                        if isinstance(source_result, dict) and source_key in source_result:
+                            task_input[dest_key] = source_result[source_key]
 
         return task_input
 

@@ -192,7 +192,9 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
         if node_type == "MapNode":
             if "parallel" in node_dict:
                 config["parallel"] = bool(node_dict.get("parallel"))
-            flow_ref = node_dict.get("inner_flow") or node_dict.get("subflow") or node_dict.get("flow")
+            flow_ref = (
+                node_dict.get("inner_flow") or node_dict.get("subflow") or node_dict.get("flow")
+            )
             if isinstance(flow_ref, dict):
                 config["inner_flow_id"] = flow_ref.get("$component_ref", "")
             elif flow_ref:
@@ -239,7 +241,9 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 result["subflow"] = {"$component_ref": flow_id}
         elif task_def.task_type == "map":
             result["parallel"] = bool(task_def.config.get("parallel", True))
-            inner_flow_id = task_def.config.get("inner_flow_id") or task_def.config.get("subflow_id")
+            inner_flow_id = task_def.config.get("inner_flow_id") or task_def.config.get(
+                "subflow_id"
+            )
             if inner_flow_id:
                 result["subflow"] = {"$component_ref": inner_flow_id}
 
@@ -369,22 +373,33 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
     def _extract_input_names(self, node: Node) -> list[str]:
         """Extract input property names from a node."""
         inputs = getattr(node, "inputs", [])
-        return [
-            p.get("title", "")
-            if isinstance(p, dict)
-            else getattr(p, "title", str(p))
-            for p in inputs
-        ]
+        return [self._extract_name_from_property(p) for p in inputs]
 
     def _extract_output_names(self, node: Node) -> list[str]:
         """Extract output property names from a node."""
         outputs = getattr(node, "outputs", [])
-        return [
-            p.get("title", "")
-            if isinstance(p, dict)
-            else getattr(p, "title", str(p))
-            for p in outputs
-        ]
+        return [self._extract_name_from_property(p) for p in outputs]
+
+    def _extract_name_from_property(self, prop: Any) -> str:
+        """Extract name from a property (dict, object, or string)."""
+        if isinstance(prop, dict):
+            title = prop.get("title")
+            if title is not None:
+                return str(title)
+            name = prop.get("name")
+            if name is not None:
+                return str(name)
+            return ""
+        if isinstance(prop, str):
+            return prop
+        # Object with title/name attribute
+        title = getattr(prop, "title", None)
+        if title is not None:
+            return str(title)
+        name = getattr(prop, "name", None)
+        if name is not None:
+            return str(name)
+        return str(prop)
 
     def _serialize_llm_config(self, llm_config: Any) -> dict[str, Any]:
         """Serialize an LLM config to dictionary.

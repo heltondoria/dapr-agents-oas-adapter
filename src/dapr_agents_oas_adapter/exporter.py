@@ -13,6 +13,7 @@ from dapr_agents_oas_adapter.converters.agent import AgentConverter
 from dapr_agents_oas_adapter.converters.base import ConversionError
 from dapr_agents_oas_adapter.converters.flow import FlowConverter
 from dapr_agents_oas_adapter.converters.tool import ToolConverter
+from dapr_agents_oas_adapter.logging import get_logger, log_operation
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     WorkflowDefinition,
@@ -48,6 +49,7 @@ class DaprAgentSpecExporter:
         self._agent_converter = AgentConverter()
         self._flow_converter = FlowConverter()
         self._tool_converter = ToolConverter()
+        self._logger = get_logger("DaprAgentSpecExporter")
 
     def to_json(
         self,
@@ -70,7 +72,7 @@ class DaprAgentSpecExporter:
         # Use serializer to get base JSON, then re-format with indent
         base_json = self._serializer.to_json(oas_component)
         if indent is not None and indent != 0:
-            # Re-parse and format with specified indentation
+            # Reparse and format with specified indentation
             return json.dumps(json.loads(base_json), indent=indent, ensure_ascii=False)
         return base_json
 
@@ -101,18 +103,34 @@ class DaprAgentSpecExporter:
         Raises:
             ConversionError: If the component cannot be exported
         """
-        if isinstance(component, DaprAgentConfig):
-            result = self._agent_converter.to_dict(component)
-        elif isinstance(component, WorkflowDefinition):
-            result = self._flow_converter.to_dict(component)
-        else:
-            raise ConversionError(
-                f"Unsupported component type: {type(component).__name__}",
-                component,
-            )
+        component_type = type(component).__name__
+        component_name = getattr(component, "name", None)
 
-        result["agentspec_version"] = self.AGENTSPEC_VERSION
-        return result
+        with log_operation(
+            "export_to_dict",
+            self._logger,
+            component_type=component_type,
+            component_name=component_name,
+        ):
+            if isinstance(component, DaprAgentConfig):
+                result = self._agent_converter.to_dict(component)
+                self._logger.debug("agent_exported", agent_name=component.name)
+            elif isinstance(component, WorkflowDefinition):
+                result = self._flow_converter.to_dict(component)
+                self._logger.debug(
+                    "workflow_exported",
+                    workflow_name=component.name,
+                    task_count=len(component.tasks),
+                )
+            else:
+                raise ConversionError(
+                    f"Unsupported component type: {component_type}",
+                    component,
+                    suggestion="Only DaprAgentConfig and WorkflowDefinition are supported",
+                )
+
+            result["agentspec_version"] = self.AGENTSPEC_VERSION
+            return result
 
     def to_component(self, component: DaprAgentConfig | WorkflowDefinition) -> Component:
         """Convert a Dapr component to an OAS Component object.
@@ -134,6 +152,7 @@ class DaprAgentSpecExporter:
             raise ConversionError(
                 f"Unsupported component type: {type(component).__name__}",
                 component,
+                suggestion="Only DaprAgentConfig and WorkflowDefinition are supported",
             )
 
     def to_json_file(
@@ -184,58 +203,77 @@ class DaprAgentSpecExporter:
         Raises:
             ConversionError: If the agent cannot be converted
         """
-        try:
-            # Extract basic properties
-            name = getattr(agent, "name", "")
-            role = getattr(agent, "role", None)
-            goal = getattr(agent, "goal", None)
-            instructions = getattr(agent, "instructions", [])
+        agent_name = getattr(agent, "name", "unknown")
+        agent_type = type(agent).__name__
 
-            # Extract tools
-            tools = getattr(agent, "tools", [])
-            tool_names = [getattr(t, "__name__", str(t)) if callable(t) else str(t) for t in tools]
+        with log_operation(
+            "extract_agent_config",
+            self._logger,
+            agent_name=agent_name,
+            agent_type=agent_type,
+        ):
+            try:
+                # Extract basic properties
+                name = getattr(agent, "name", "")
+                role = getattr(agent, "role", None)
+                goal = getattr(agent, "goal", None)
+                instructions = getattr(agent, "instructions", [])
 
-            # Extract tool definitions
-            tool_definitions = []
-            for tool in tools:
-                if callable(tool):
-                    tool_def = self._tool_converter.from_callable(tool)
-                    tool_definitions.append(self._tool_converter.to_dict(tool_def))
+                # Extract tools
+                tools = getattr(agent, "tools", [])
+                tool_names = [
+                    getattr(t, "__name__", str(t)) if callable(t) else str(t) for t in tools
+                ]
 
-            # Extract Dapr-specific configuration
-            message_bus_name = getattr(agent, "message_bus_name", "messagepubsub")
-            state_store_name = getattr(agent, "state_store_name", "statestore")
-            agents_registry_store_name = getattr(
-                agent, "agents_registry_store_name", "agentsregistry"
-            )
-            service_port = getattr(agent, "service_port", 8000)
+                # Extract tool definitions
+                tool_definitions = []
+                for tool in tools:
+                    if callable(tool):
+                        tool_def = self._tool_converter.from_callable(tool)
+                        tool_definitions.append(self._tool_converter.to_dict(tool_def))
 
-            # Determine agent type
-            agent_type = type(agent).__name__
+                # Extract Dapr-specific configuration
+                message_bus_name = getattr(agent, "message_bus_name", "messagepubsub")
+                state_store_name = getattr(agent, "state_store_name", "statestore")
+                agents_registry_store_name = getattr(
+                    agent, "agents_registry_store_name", "agentsregistry"
+                )
+                service_port = getattr(agent, "service_port", 8000)
 
-            # Build system prompt from instructions
-            system_prompt = self._build_system_prompt(role, goal, instructions)
+                # Determine an agent type from the agent class
+                extracted_agent_type = type(agent).__name__
 
-            return DaprAgentConfig(
-                name=name,
-                role=role,
-                goal=goal,
-                instructions=list(instructions) if instructions else [],
-                system_prompt=system_prompt,
-                tools=tool_names,
-                message_bus_name=message_bus_name,
-                state_store_name=state_store_name,
-                agents_registry_store_name=agents_registry_store_name,
-                service_port=service_port,
-                agent_type=agent_type,
-                tool_definitions=tool_definitions,
-            )
+                # Build system prompt from instructions
+                system_prompt = self._build_system_prompt(role, goal, instructions)
 
-        except Exception as e:
-            raise ConversionError(
-                f"Failed to extract configuration from Dapr agent: {e}",
-                agent,
-            ) from e
+                self._logger.debug(
+                    "agent_config_extracted",
+                    tool_count=len(tool_names),
+                    has_instructions=len(instructions) > 0,
+                )
+
+                return DaprAgentConfig(
+                    name=name,
+                    role=role,
+                    goal=goal,
+                    instructions=list(instructions) if instructions else [],
+                    system_prompt=system_prompt,
+                    tools=tool_names,
+                    message_bus_name=message_bus_name,
+                    state_store_name=state_store_name,
+                    agents_registry_store_name=agents_registry_store_name,
+                    service_port=service_port,
+                    agent_type=extracted_agent_type,
+                    tool_definitions=tool_definitions,
+                )
+
+            except Exception as e:
+                raise ConversionError(
+                    "Failed to extract configuration from Dapr agent",
+                    agent,
+                    suggestion="Ensure the agent was created using dapr-agents library",
+                    caused_by=e,
+                ) from e
 
     def from_dapr_workflow(
         self,
@@ -267,7 +305,7 @@ class DaprAgentSpecExporter:
             # Extract tasks from task functions
             tasks: list[WorkflowTaskDefinition] = []
 
-            # Add start node
+            # Add a start node
             tasks.append(
                 WorkflowTaskDefinition(
                     name="start",
@@ -283,7 +321,7 @@ class DaprAgentSpecExporter:
                     task_name = getattr(func, "__name__", f"task_{i}")
                     task_doc = func.__doc__ or ""
 
-                    # Determine task type from function
+                    # Determine a task type from a function
                     task_type = self._infer_task_type(func)
 
                     tasks.append(
@@ -334,8 +372,10 @@ class DaprAgentSpecExporter:
 
         except Exception as e:
             raise ConversionError(
-                f"Failed to extract definition from Dapr workflow: {e}",
+                "Failed to extract definition from Dapr workflow",
                 workflow_func,
+                suggestion="Ensure the workflow was decorated with @workflow from dapr-agents",
+                caused_by=e,
             ) from e
 
     def export_agent_to_json(self, agent: Any) -> str:
@@ -419,7 +459,7 @@ class DaprAgentSpecExporter:
         return "\n".join(parts)
 
     def _infer_task_type(self, func: Callable[..., Any]) -> str:
-        """Infer task type from function characteristics."""
+        """Infer the task type from function characteristics."""
         func_name = getattr(func, "__name__", "").lower()
         func_doc = (func.__doc__ or "").lower()
 
