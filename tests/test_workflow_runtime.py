@@ -338,3 +338,170 @@ def test_compensation_runs_on_failure(workflow_stubs):
         _run_workflow(wf(ctx, {}), handler)
 
     assert any(call[1] == "compensate_a" for call in ctx.calls)
+
+
+def test_join_node_waits_for_all_predecessors(workflow_stubs):
+    """Test that join nodes wait for ALL incoming edges before executing."""
+    # Workflow: start -> (task_a, task_b) -> join_node -> end
+    converter = FlowConverter()
+    workflow_def = WorkflowDefinition(
+        name="join_flow",
+        tasks=[
+            WorkflowTaskDefinition(name="start", task_type="start"),
+            WorkflowTaskDefinition(name="task_a", task_type="llm"),
+            WorkflowTaskDefinition(name="task_b", task_type="llm"),
+            WorkflowTaskDefinition(name="join_node", task_type="llm"),
+            WorkflowTaskDefinition(name="end", task_type="end"),
+        ],
+        edges=[
+            WorkflowEdgeDefinition(from_node="start", to_node="task_a"),
+            WorkflowEdgeDefinition(from_node="start", to_node="task_b"),
+            WorkflowEdgeDefinition(
+                from_node="task_a",
+                to_node="join_node",
+                data_mapping={"a_result": "a_input"},
+            ),
+            WorkflowEdgeDefinition(
+                from_node="task_b",
+                to_node="join_node",
+                data_mapping={"b_result": "b_input"},
+            ),
+            WorkflowEdgeDefinition(from_node="join_node", to_node="end"),
+        ],
+        start_node="start",
+        end_nodes=["end"],
+    )
+
+    wf = converter.create_dapr_workflow(workflow_def)
+    ctx = DummyWorkflowContext()
+    handler = _make_handler(
+        ctx,
+        activity_results={
+            "task_a": {"a_result": "from_a"},
+            "task_b": {"b_result": "from_b"},
+            "join_node": {"combined": "joined"},
+        },
+    )
+    _run_workflow(wf(ctx, {"input": "value"}), handler)
+
+    # Verify join_node was called with data from BOTH task_a and task_b
+    join_call = next(
+        (call for call in ctx.calls if call[1] == "join_node"),
+        None,
+    )
+    assert join_call is not None
+    join_input = join_call[2]
+    assert "a_input" in join_input, "join_node should receive a_input from task_a"
+    assert "b_input" in join_input, "join_node should receive b_input from task_b"
+    assert join_input["a_input"] == "from_a"
+    assert join_input["b_input"] == "from_b"
+
+
+def test_diamond_pattern_fork_join(workflow_stubs):
+    """Test diamond pattern: start -> (A, B) -> merge -> end."""
+    converter = FlowConverter()
+    workflow_def = WorkflowDefinition(
+        name="diamond_flow",
+        tasks=[
+            WorkflowTaskDefinition(name="start", task_type="start"),
+            WorkflowTaskDefinition(name="branch_a", task_type="llm"),
+            WorkflowTaskDefinition(name="branch_b", task_type="llm"),
+            WorkflowTaskDefinition(name="merge", task_type="llm"),
+            WorkflowTaskDefinition(name="end", task_type="end"),
+        ],
+        edges=[
+            WorkflowEdgeDefinition(from_node="start", to_node="branch_a"),
+            WorkflowEdgeDefinition(from_node="start", to_node="branch_b"),
+            WorkflowEdgeDefinition(
+                from_node="branch_a",
+                to_node="merge",
+                data_mapping={"result": "a_result"},
+            ),
+            WorkflowEdgeDefinition(
+                from_node="branch_b",
+                to_node="merge",
+                data_mapping={"result": "b_result"},
+            ),
+            WorkflowEdgeDefinition(from_node="merge", to_node="end"),
+        ],
+        start_node="start",
+        end_nodes=["end"],
+    )
+
+    wf = converter.create_dapr_workflow(workflow_def)
+    ctx = DummyWorkflowContext()
+    handler = _make_handler(
+        ctx,
+        activity_results={
+            "branch_a": {"result": "A_OUTPUT"},
+            "branch_b": {"result": "B_OUTPUT"},
+            "merge": {"merged": "success"},
+        },
+    )
+    _run_workflow(wf(ctx, {"input": "start"}), handler)
+
+    # Verify merge received both inputs
+    merge_call = next(
+        (call for call in ctx.calls if call[1] == "merge"),
+        None,
+    )
+    assert merge_call is not None
+    merge_input = merge_call[2]
+    assert merge_input.get("a_result") == "A_OUTPUT"
+    assert merge_input.get("b_result") == "B_OUTPUT"
+
+
+def test_linear_workflow_unchanged(workflow_stubs):
+    """Ensure linear workflows still work after join fix."""
+    converter = FlowConverter()
+    workflow_def = WorkflowDefinition(
+        name="linear_flow",
+        tasks=[
+            WorkflowTaskDefinition(name="start", task_type="start"),
+            WorkflowTaskDefinition(name="step1", task_type="llm"),
+            WorkflowTaskDefinition(name="step2", task_type="llm"),
+            WorkflowTaskDefinition(name="step3", task_type="llm"),
+            WorkflowTaskDefinition(name="end", task_type="end"),
+        ],
+        edges=[
+            WorkflowEdgeDefinition(
+                from_node="start",
+                to_node="step1",
+                data_mapping={"input": "data"},
+            ),
+            WorkflowEdgeDefinition(
+                from_node="step1",
+                to_node="step2",
+                data_mapping={"output": "input"},
+            ),
+            WorkflowEdgeDefinition(
+                from_node="step2",
+                to_node="step3",
+                data_mapping={"output": "input"},
+            ),
+            WorkflowEdgeDefinition(
+                from_node="step3",
+                to_node="end",
+                data_mapping={"output": "final"},
+            ),
+        ],
+        start_node="start",
+        end_nodes=["end"],
+    )
+
+    wf = converter.create_dapr_workflow(workflow_def)
+    ctx = DummyWorkflowContext()
+    handler = _make_handler(
+        ctx,
+        activity_results={
+            "step1": {"output": "step1_done"},
+            "step2": {"output": "step2_done"},
+            "step3": {"output": "step3_done"},
+        },
+    )
+    result = _run_workflow(wf(ctx, {"input": "initial"}), handler)
+
+    # Verify all steps were called in order
+    activity_calls = [call[1] for call in ctx.calls if call[0] == "activity"]
+    assert activity_calls == ["step1", "step2", "step3"]
+    assert result.get("final") == "step3_done"

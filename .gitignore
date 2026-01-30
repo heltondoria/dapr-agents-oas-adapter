@@ -89,3 +89,7 @@ secrets.json
 /.ralph/.last_reset
 /.ralph/.ralph_session
 /.ralph/.ralph_session_history
+
+# Dapr runtime logs
+**/.dapr/logs/
+.dapr/logs/

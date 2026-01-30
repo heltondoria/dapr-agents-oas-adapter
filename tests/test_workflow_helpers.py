@@ -1,5 +1,6 @@
 """Tests for workflow helper classes."""
 
+import types
 from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -209,6 +210,7 @@ class TestActivityStubManager:
         stub = manager.get_stub("my_activity")
 
         assert callable(stub)
+        assert isinstance(stub, types.FunctionType)
         assert stub.__name__ == "my_activity"
         assert stub.__qualname__ == "my_activity"
 

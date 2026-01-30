@@ -483,6 +483,16 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                         if not task:
                             continue
 
+                        # Join synchronization: wait for all incoming edges before executing
+                        expected_edge_count = len(incoming_edges.get(task_name, []))
+                        arrived_edge_count = len(pending_inputs.get(task_name, []))
+
+                        if arrived_edge_count < expected_edge_count:
+                            # Not all predecessors have completed yet; re-queue
+                            if task_name not in pending_queue:
+                                pending_queue.append(task_name)
+                            continue
+
                         edges_for_task = pending_inputs.pop(task_name, [])
                         task_input = self._build_task_input(task, results, edges_for_task)
 
