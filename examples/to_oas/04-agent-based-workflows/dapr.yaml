@@ -1,0 +1,12 @@
+version: 1
+
+apps:
+  - appID: oas-to-agent-wf
+    appDirPath: .
+    command: ["uv", "run", "python", "workflow_agents.py"]
+    resourcesPaths:
+      - ./components
+      - ../../../dapr/components/secrets
+      - ../../_shared/dapr/components/openai
+      - ../../_shared/dapr/components/workflow
+

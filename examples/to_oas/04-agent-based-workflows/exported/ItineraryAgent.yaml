@@ -1,0 +1,28 @@
+component_type: Agent
+id: agent_32c5d784
+name: ItineraryAgent
+description: Expand a trip outline into a detailed itinerary.
+metadata: null
+inputs: []
+outputs: []
+llm_config:
+  component_type: VllmConfig
+  id: llm_a709d323
+  name: default_llm
+  description: null
+  metadata: {}
+  default_generation_parameters: null
+  url: https://api.openai.com/v1
+  model_id: gpt-4
+system_prompt: 'You are Itinerary expander.
+
+  Your goal is to Expand a trip outline into a detailed itinerary..
+
+
+  Instructions:
+
+  - Expand a 3-day outline into a detailed itinerary.
+
+  - Include Morning, Afternoon, and Evening sections each day.'
+tools: []
+agentspec_version: 25.4.1

@@ -1,5 +1,6 @@
 """Flow converter for OAS <-> Dapr Agents workflows."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +17,14 @@ from dapr_agents_oas_adapter.converters.base import (
     ConversionError,
 )
 from dapr_agents_oas_adapter.converters.node import NodeConverter
+from dapr_agents_oas_adapter.converters.workflow_helpers import (
+    ActivityStubManager,
+    BranchRouter,
+    CompensationHandler,
+    RetryPolicyBuilder,
+    TaskExecutor,
+)
+from dapr_agents_oas_adapter.logging import get_logger
 from dapr_agents_oas_adapter.types import (
     NamedCallable,
     ToolRegistry,
@@ -70,6 +79,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         return WorkflowDefinition(
             name=component.name,
             description=component.description,
+            flow_id=getattr(component, "id", None),
             tasks=tasks,
             edges=edges,
             start_node=start_node,
@@ -87,7 +97,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         Returns:
             OAS Flow with equivalent structure
         """
-        flow_id = generate_id("flow")
+        flow_id = component.flow_id or generate_id("flow")
 
         # Convert tasks to nodes
         nodes: list[Node] = []
@@ -169,8 +179,16 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             return comp_type == "Flow"
         return False
 
-    def from_dict(self, flow_dict: dict[str, Any]) -> WorkflowDefinition:
+    def from_dict(
+        self, flow_dict: dict[str, Any], *, _visited_flows: set[str] | None = None
+    ) -> WorkflowDefinition:
         """Convert a dictionary representation to WorkflowDefinition."""
+        visited_flows = _visited_flows or set()
+        flow_id = flow_dict.get("id")
+        if flow_id:
+            if flow_id in visited_flows:
+                return WorkflowDefinition(name=flow_dict.get("name", ""), flow_id=flow_id)
+            visited_flows.add(flow_id)
         # Get referenced components for resolving $component_ref
         referenced_components = flow_dict.get("$referenced_components", {})
 
@@ -265,15 +283,19 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             if task.task_type == "end":
                 end_nodes.append(task.name)
 
+        subflows = self._extract_subflows(referenced_components, visited_flows)
+
         return WorkflowDefinition(
             name=flow_dict.get("name", ""),
             description=flow_dict.get("description"),
+            flow_id=flow_dict.get("id"),
             tasks=tasks,
             edges=edges,
             start_node=start_node,
             end_nodes=end_nodes,
             inputs=flow_dict.get("inputs", []),
             outputs=flow_dict.get("outputs", []),
+            subflows=subflows,
         )
 
     def to_dict(self, workflow_def: WorkflowDefinition) -> dict[str, Any]:
@@ -287,6 +309,11 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             node_id = node_dict["id"]
             referenced[node_id] = node_dict
             nodes.append({"$component_ref": node_id})
+
+        for subflow_id, subflow_def in workflow_def.subflows.items():
+            subflow_dict = self.to_dict(subflow_def)
+            referenced_key = subflow_def.flow_id or subflow_id
+            referenced[referenced_key] = subflow_dict
 
         # Build control flow edges
         control_edges: list[dict[str, Any]] = []
@@ -327,9 +354,10 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         # Find start node ID
         start_node_id = name_to_id.get(workflow_def.start_node or "", "")
 
+        flow_id = workflow_def.flow_id or generate_id("flow")
         return {
             "component_type": "Flow",
-            "id": generate_id("flow"),
+            "id": flow_id,
             "name": workflow_def.name,
             "description": workflow_def.description,
             "inputs": workflow_def.inputs,
@@ -346,6 +374,8 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         self,
         workflow_def: WorkflowDefinition,
         task_implementations: dict[str, Callable[..., Any]] | None = None,
+        *,
+        _visited_workflows: set[str] | None = None,
     ) -> NamedCallable:
         """Create a Dapr workflow function from a WorkflowDefinition.
 
@@ -360,49 +390,146 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             ConversionError: If workflow creation fails
         """
         try:
-            # Build the task execution order from edges
-            execution_order = self._build_execution_order(workflow_def)
+            import dapr.ext.workflow as wf
+        except Exception as e:
+            raise ConversionError(
+                "Failed to import Dapr workflow SDK",
+                workflow_def,
+                suggestion="Install dapr-ext-workflow: pip install dapr-ext-workflow",
+                caused_by=e,
+            ) from e
 
-            # Create the workflow function
+        try:
+            visited_workflows = _visited_workflows or set()
+            flow_key = workflow_def.flow_id or workflow_def.name
+            visited_workflows.add(flow_key)
+
+            # Initialize helper classes
+            stub_manager = ActivityStubManager()
+            retry_builder = RetryPolicyBuilder(wf)
+            branch_router = BranchRouter()
+            compensation_handler = CompensationHandler()
+            task_executor = TaskExecutor(wf, retry_builder, stub_manager, task_implementations)
+
+            # Build task and edge lookups
+            tasks_by_name: dict[str, WorkflowTaskDefinition] = {
+                task.name: task for task in workflow_def.tasks
+            }
+            outgoing_edges: dict[str, list[WorkflowEdgeDefinition]] = {}
+            incoming_edges: dict[str, list[WorkflowEdgeDefinition]] = {}
+            for edge in workflow_def.edges:
+                outgoing_edges.setdefault(edge.from_node, []).append(edge)
+                incoming_edges.setdefault(edge.to_node, []).append(edge)
+
+            # Build child workflows for subflows
+            child_workflows: list[NamedCallable] = []
+            for subflow_def in workflow_def.subflows.values():
+                subflow_key = subflow_def.flow_id or subflow_def.name
+                if subflow_key in visited_workflows:
+                    continue
+                child_workflows.append(
+                    self.create_dapr_workflow(
+                        subflow_def,
+                        task_implementations,
+                        _visited_workflows=visited_workflows,
+                    )
+                )
+
+            def _call_compensation_activity(
+                ctx: Any, activity_name: str, payload: dict[str, Any], retry: Any
+            ) -> Any:
+                """Helper for compensation handler to call activities."""
+                activity = stub_manager.get_stub(activity_name)
+                kwargs: dict[str, Any] = {"input": payload}
+                if retry is not None:
+                    kwargs["retry_policy"] = retry
+                try:
+                    return ctx.call_activity(activity, **kwargs)
+                except TypeError:
+                    kwargs.pop("retry_policy", None)
+                    return ctx.call_activity(activity, **kwargs)
+
             def workflow_function(ctx: Any, input_params: dict[str, Any]) -> Any:
                 """Generated Dapr workflow function."""
                 results: dict[str, Any] = {"__input__": input_params}
+                executed: list[str] = []
+                executed_set: set[str] = set()
+                pending_queue: list[str] = []
+                pending_inputs: dict[str, list[WorkflowEdgeDefinition]] = {}
 
-                for task_name in execution_order:
-                    task = next((t for t in workflow_def.tasks if t.name == task_name), None)
-                    if not task:
-                        continue
+                def _enqueue_edge(edge: WorkflowEdgeDefinition) -> None:
+                    if edge.to_node in executed_set:
+                        return
+                    pending_inputs.setdefault(edge.to_node, []).append(edge)
+                    if edge.to_node not in pending_queue:
+                        pending_queue.append(edge.to_node)
 
-                    # Skip start/end nodes
-                    if task.task_type in ("start", "end"):
-                        continue
+                # Seed with start node outputs
+                if workflow_def.start_node:
+                    results[workflow_def.start_node] = input_params
+                    for edge in outgoing_edges.get(workflow_def.start_node, []):
+                        _enqueue_edge(edge)
+                else:
+                    for task_name in tasks_by_name:
+                        if task_name not in incoming_edges:
+                            pending_queue.append(task_name)
 
-                    # Get task input from previous results
-                    task_input = self._build_task_input(task, results, workflow_def.edges)
+                try:
+                    while pending_queue:
+                        task_name = pending_queue.pop(0)
+                        if task_name in executed_set:
+                            continue
+                        task = tasks_by_name.get(task_name)
+                        if not task:
+                            continue
 
-                    # Execute task
-                    if task_implementations and task_name in task_implementations:
-                        impl = task_implementations[task_name]
-                        result = impl(**task_input)
-                    else:
-                        # Use ctx.call_activity for Dapr workflow
-                        result = ctx.call_activity(task_name, input=task_input)
+                        # Join synchronization: wait for all incoming edges before executing
+                        expected_edge_count = len(incoming_edges.get(task_name, []))
+                        arrived_edge_count = len(pending_inputs.get(task_name, []))
 
-                    results[task_name] = result
+                        if arrived_edge_count < expected_edge_count:
+                            # Not all predecessors have completed yet; re-queue
+                            if task_name not in pending_queue:
+                                pending_queue.append(task_name)
+                            continue
 
-                # Return final outputs
+                        edges_for_task = pending_inputs.pop(task_name, [])
+                        task_input = self._build_task_input(task, results, edges_for_task)
+
+                        if task.task_type in ("start", "end"):
+                            results[task_name] = task_input
+                        else:
+                            result = yield from task_executor.execute(ctx, task, task_input)
+                            results[task_name] = result
+
+                        executed.append(task_name)
+                        executed_set.add(task_name)
+
+                        next_edges = branch_router.select_next_edges(
+                            task.name, task.config, results.get(task_name), outgoing_edges
+                        )
+                        for edge in next_edges:
+                            _enqueue_edge(edge)
+                except Exception as exc:
+                    yield from compensation_handler.execute_compensations(
+                        ctx, executed, results, tasks_by_name, exc, _call_compensation_activity
+                    )
+                    raise
+
                 return self._build_workflow_output(workflow_def, results)
 
-            # Set function metadata
             workflow_function.__name__ = workflow_def.name
             workflow_function.__doc__ = workflow_def.description or f"Workflow: {workflow_def.name}"
+            workflow_function.child_workflows = child_workflows  # type: ignore[attr-defined]
 
             return workflow_function
 
         except Exception as e:
             raise ConversionError(
-                f"Failed to create Dapr workflow: {e}",
+                "Failed to create Dapr workflow",
                 workflow_def,
+                suggestion="Check workflow definition for invalid task types or edge references",
+                caused_by=e,
             ) from e
 
     def generate_workflow_code(self, workflow_def: WorkflowDefinition) -> str:
@@ -573,16 +700,45 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 result.append(prop.model_dump())
         return result
 
+    def _extract_subflows(
+        self,
+        referenced_components: dict[str, Any],
+        visited_flows: set[str],
+    ) -> dict[str, WorkflowDefinition]:
+        """Extract referenced subflows into WorkflowDefinition objects."""
+        subflows: dict[str, WorkflowDefinition] = {}
+        for comp_id, component in referenced_components.items():
+            if not isinstance(component, dict):
+                continue
+            if component.get("component_type") != "Flow":
+                continue
+            if comp_id in visited_flows:
+                continue
+            try:
+                subflow_def = self.from_dict(component, _visited_flows=visited_flows)
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning(
+                    "Failed to parse subflow",
+                    flow_id=comp_id,
+                    error=str(e),
+                )
+                continue
+            subflows[comp_id] = subflow_def
+        return subflows
+
     def _dicts_to_properties(self, props: list[dict[str, Any]]) -> list[Property]:
         """Convert dictionary property schemas to Property objects."""
         result: list[Property] = []
         for prop in props:
             if isinstance(prop, dict):
+                description = prop.get("description")
                 result.append(
                     Property(
                         title=prop.get("title", ""),
                         type=prop.get("type", "string"),
-                        description=prop.get("description"),
+                        # `pyagentspec.Property` validates JSON schema; do not pass None.
+                        description=str(description) if description is not None else "",
                         default=prop.get("default"),
                     )
                 )
@@ -623,17 +779,50 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         results: dict[str, Any],
         edges: list[WorkflowEdgeDefinition],
     ) -> dict[str, Any]:
-        """Build input for a task from previous results."""
+        """Build input for a task from selected edges.
+
+        For end nodes without explicit data_mapping, propagate all source results
+        to ensure workflow output captures the final state.
+        """
         task_input: dict[str, Any] = {}
 
         for edge in edges:
             if edge.to_node == task.name:
                 source_result = results.get(edge.from_node, {})
-                for source_key, dest_key in edge.data_mapping.items():
-                    if isinstance(source_result, dict) and source_key in source_result:
-                        task_input[dest_key] = source_result[source_key]
+                if source_result is None:
+                    source_result = {}
+                if isinstance(source_result, str):
+                    parsed = self._try_parse_json_dict(source_result)
+                    if parsed is not None:
+                        source_result = parsed
+                if not isinstance(source_result, dict):
+                    # Normalize scalar results (e.g., str) so they can be mapped.
+                    source_result = {"result": source_result}
+
+                # For end nodes without data_mapping, propagate all source results
+                if task.task_type == "end" and not edge.data_mapping:
+                    if isinstance(source_result, dict):
+                        task_input.update(source_result)
+                else:
+                    for source_key, dest_key in edge.data_mapping.items():
+                        if isinstance(source_result, dict) and source_key in source_result:
+                            task_input[dest_key] = source_result[source_key]
 
         return task_input
+
+    @staticmethod
+    def _try_parse_json_dict(value: str) -> dict[str, Any] | None:
+        """Best-effort parse of a JSON object (dict) serialized as a string."""
+        raw = value.strip()
+        if not raw:
+            return None
+        if raw[0] != "{":
+            return None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
 
     def _build_workflow_output(
         self,

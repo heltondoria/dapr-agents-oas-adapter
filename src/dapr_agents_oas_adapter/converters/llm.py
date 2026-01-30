@@ -53,9 +53,11 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         provider = OAS_LLM_TO_DAPR_PROVIDER.get(component_type)
 
         if provider is None:
+            supported = ", ".join(OAS_LLM_TO_DAPR_PROVIDER.keys())
             raise ConversionError(
                 f"Unsupported LLM config type: {component_type}",
                 component,
+                suggestion=f"Supported types are: {supported}",
             )
 
         # Extract common fields
@@ -109,9 +111,11 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         oas_type = DAPR_PROVIDER_TO_OAS_LLM.get(component.provider)
 
         if oas_type is None:
+            supported = ", ".join(DAPR_PROVIDER_TO_OAS_LLM.keys())
             raise ConversionError(
                 f"Unsupported Dapr LLM provider: {component.provider}",
                 component,
+                suggestion=f"Supported providers are: {supported}",
             )
 
         # Build generation parameters
@@ -147,7 +151,11 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
                 url=component.url or "http://localhost:11434",
             )
         else:
-            raise ConversionError(f"Unhandled OAS type: {oas_type}", component)
+            raise ConversionError(
+                f"Unhandled OAS type: {oas_type}",
+                component,
+                suggestion="This is an internal error, please report it",
+            )
 
     def can_convert(self, component: Any) -> bool:
         """Check if this converter can handle the given component.

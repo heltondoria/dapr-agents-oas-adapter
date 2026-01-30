@@ -1,0 +1,28 @@
+component_type: Agent
+id: agent_33be91af
+name: DestinationExtractor
+description: Extract the destination city from a user message.
+metadata: null
+inputs: []
+outputs: []
+llm_config:
+  component_type: VllmConfig
+  id: llm_5ac50301
+  name: default_llm
+  description: null
+  metadata: {}
+  default_generation_parameters: null
+  url: https://api.openai.com/v1
+  model_id: gpt-4
+system_prompt: 'You are Extract destination.
+
+  Your goal is to Extract the destination city from a user message..
+
+
+  Instructions:
+
+  - Extract the main city from the user''s message.
+
+  - Return only the city name, nothing else.'
+tools: []
+agentspec_version: 25.4.1

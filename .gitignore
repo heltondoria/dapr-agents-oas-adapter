@@ -76,3 +76,20 @@ dmypy.json
 
 
 .cursor
+secrets.json
+**/components/secrets.json
+.ralph/logs
+.ralph/status.json
+.ralph/.call_count
+.ralph/progress.json
+.ralph/.circuit_breaker_history
+/site/
+/.ralph/.circuit_breaker_state
+/.ralph/.exit_signals
+/.ralph/.last_reset
+/.ralph/.ralph_session
+/.ralph/.ralph_session_history
+
+# Dapr runtime logs
+**/.dapr/logs/
+.dapr/logs/

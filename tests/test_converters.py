@@ -26,6 +26,117 @@ from dapr_agents_oas_adapter.types import (
 )
 
 
+class TestConversionError:
+    """Tests for ConversionError class."""
+
+    def test_basic_error_message(self) -> None:
+        """Test basic error message without extras."""
+        error = ConversionError("Something went wrong")
+        assert "Something went wrong" in str(error)
+        assert error.component is None
+        assert error.suggestion is None
+        assert error.caused_by is None
+
+    def test_error_with_component(self) -> None:
+        """Test error includes component info."""
+        component = {"name": "my_agent", "component_type": "Agent"}
+        error = ConversionError("Failed to convert", component)
+        message = str(error)
+        assert "Failed to convert" in message
+        assert "type=Agent" in message
+        assert "name=my_agent" in message
+
+    def test_error_with_object_component(self) -> None:
+        """Test error with object component extracts name and type."""
+        component = MagicMock()
+        component.name = "test_flow"
+        component.component_type = "Flow"
+        error = ConversionError("Conversion failed", component)
+        message = str(error)
+        assert "type=Flow" in message
+        assert "name=test_flow" in message
+
+    def test_error_with_suggestion(self) -> None:
+        """Test error includes suggestion."""
+        error = ConversionError(
+            "Invalid component",
+            suggestion="Check the component_type field",
+        )
+        message = str(error)
+        assert "Invalid component" in message
+        assert "Suggestion: Check the component_type field" in message
+
+    def test_error_with_caused_by(self) -> None:
+        """Test error includes cause information."""
+        cause = ValueError("Invalid value")
+        error = ConversionError(
+            "Processing failed",
+            caused_by=cause,
+        )
+        message = str(error)
+        assert "Processing failed" in message
+        assert "Caused by: ValueError: Invalid value" in message
+
+    def test_error_full_context(self) -> None:
+        """Test error with all context information."""
+        component = {"name": "workflow1", "component_type": "Flow"}
+        cause = KeyError("missing_field")
+        error = ConversionError(
+            "Workflow conversion failed",
+            component,
+            suggestion="Ensure all required fields are present",
+            caused_by=cause,
+        )
+        message = str(error)
+        assert "Workflow conversion failed" in message
+        assert "type=Flow" in message
+        assert "name=workflow1" in message
+        assert "Suggestion: Ensure all required fields are present" in message
+        assert "Caused by: KeyError" in message
+
+    def test_base_message_property(self) -> None:
+        """Test base_message returns original message."""
+        error = ConversionError(
+            "Original message",
+            {"name": "test"},
+            suggestion="Try again",
+        )
+        assert error.base_message == "Original message"
+
+    def test_with_suggestion_creates_new_error(self) -> None:
+        """Test with_suggestion creates a new error."""
+        original = ConversionError("Error", {"name": "test"})
+        new_error = original.with_suggestion("Fix the issue")
+
+        assert new_error is not original
+        assert "Suggestion: Fix the issue" in str(new_error)
+        assert new_error.component == original.component
+
+    def test_with_cause_creates_new_error(self) -> None:
+        """Test with_cause creates a new error."""
+        original = ConversionError("Error", suggestion="Check inputs")
+        cause = RuntimeError("Root cause")
+        new_error = original.with_cause(cause)
+
+        assert new_error is not original
+        assert "Caused by: RuntimeError" in str(new_error)
+        assert new_error.suggestion == original.suggestion
+
+    def test_error_with_component_without_name(self) -> None:
+        """Test error with component that has no name attribute."""
+        component = {"component_type": "Tool"}
+        error = ConversionError("Error", component)
+        message = str(error)
+        assert "type=Tool" in message
+
+    def test_error_component_fallback_to_class_name(self) -> None:
+        """Test fallback to class name when no component_type."""
+        component = MagicMock(spec=[])  # No name or component_type
+        error = ConversionError("Error", component)
+        message = str(error)
+        assert "MagicMock" in message
+
+
 class TestLlmConfigConverter:
     """Tests for LlmConfigConverter."""
 
@@ -1079,6 +1190,7 @@ class TestAgentConverter:
         mock_llm.__class__.__name__ = "OpenAIConfig"
         mock_llm.model_id = "gpt-4"
         mock_llm.url = None
+        mock_llm.api_key = None  # Required for Pydantic validation
         mock_llm.default_generation_parameters = None
 
         mock_agent = MagicMock()
@@ -1333,6 +1445,7 @@ class TestAgentConverter:
         mock_llm.__class__.__name__ = "OpenAIConfig"
         mock_llm.model_id = "gpt-4"
         mock_llm.url = None
+        mock_llm.api_key = None  # Required for Pydantic validation
         mock_llm.default_generation_parameters = None
 
         mock_agent = MagicMock()
@@ -3163,11 +3276,24 @@ class TestFlowConverter:
         implementations = {"task1": task1_impl}
         workflow_func = converter.create_dapr_workflow(workflow, implementations)
 
-        # Execute the workflow
+        # Execute the workflow - it's a generator, so we need to iterate it
         mock_ctx = MagicMock()
-        result = workflow_func(mock_ctx, {"input": "test"})
-        # Result should have status since end node has no results
-        assert "status" in result or "result" in result
+        gen = workflow_func(mock_ctx, {"input": "test"})
+
+        # Helper to run the generator to completion
+        def run_generator(g: Any) -> Any:
+            result = None
+            while True:
+                try:
+                    g.send(result)  # Consume yielded value (activity stub)
+                    # Mock the activity call result
+                    result = {"result": "processed"}
+                except StopIteration as exc:
+                    return exc.value
+
+        result = run_generator(gen)
+        # Result should have result from task1 propagated through end node
+        assert "result" in result
 
     def test_create_dapr_workflow_without_description(self) -> None:
         """Test create_dapr_workflow uses name when no description."""
@@ -3822,6 +3948,277 @@ class TestComponentConverterBase:
 
         result = converter.get_component_metadata(mock_component)
         assert result["description"] == "Only description"
+
+
+class TestFlowConverterCoverage:
+    """Additional tests to improve FlowConverter coverage."""
+
+    def test_try_parse_json_dict_empty_string(self) -> None:
+        """Test _try_parse_json_dict with empty string."""
+        converter = FlowConverter()
+        result = converter._try_parse_json_dict("")
+        assert result is None
+
+    def test_try_parse_json_dict_whitespace_only(self) -> None:
+        """Test _try_parse_json_dict with whitespace."""
+        converter = FlowConverter()
+        result = converter._try_parse_json_dict("   ")
+        assert result is None
+
+    def test_try_parse_json_dict_non_object(self) -> None:
+        """Test _try_parse_json_dict with non-object JSON (array)."""
+        converter = FlowConverter()
+        result = converter._try_parse_json_dict("[1, 2, 3]")
+        assert result is None
+
+    def test_try_parse_json_dict_invalid_json(self) -> None:
+        """Test _try_parse_json_dict with invalid JSON."""
+        converter = FlowConverter()
+        result = converter._try_parse_json_dict("{invalid json}")
+        assert result is None
+
+    def test_try_parse_json_dict_valid_object(self) -> None:
+        """Test _try_parse_json_dict with valid JSON object."""
+        converter = FlowConverter()
+        result = converter._try_parse_json_dict('{"key": "value"}')
+        assert result == {"key": "value"}
+
+    def test_build_task_input_with_json_string_result(self) -> None:
+        """Test _build_task_input parses JSON string results."""
+        converter = FlowConverter()
+        task = WorkflowTaskDefinition(name="end", task_type="end")
+        edges = [
+            WorkflowEdgeDefinition(
+                from_node="prev",
+                to_node="end",
+                data_mapping={"result": "output"},
+            )
+        ]
+        results = {"prev": '{"result": "success"}'}
+        task_input = converter._build_task_input(task, results, edges)
+        assert task_input.get("output") == "success"
+
+    def test_build_task_input_with_scalar_string_result(self) -> None:
+        """Test _build_task_input normalizes scalar string results."""
+        converter = FlowConverter()
+        task = WorkflowTaskDefinition(name="process", task_type="llm")
+        edges = [
+            WorkflowEdgeDefinition(
+                from_node="prev",
+                to_node="process",
+                data_mapping={"result": "input"},
+            )
+        ]
+        results = {"prev": "plain string"}
+        task_input = converter._build_task_input(task, results, edges)
+        assert task_input.get("input") == "plain string"
+
+    def test_build_task_input_none_result(self) -> None:
+        """Test _build_task_input handles None source result."""
+        converter = FlowConverter()
+        task = WorkflowTaskDefinition(name="end", task_type="end")
+        edges = [
+            WorkflowEdgeDefinition(
+                from_node="prev",
+                to_node="end",
+                data_mapping={},
+            )
+        ]
+        results = {"prev": None}
+        task_input = converter._build_task_input(task, results, edges)
+        assert task_input == {}
+
+    def test_to_dict_with_data_mappings(self) -> None:
+        """Test to_dict creates data flow edges from mappings."""
+        converter = FlowConverter()
+        workflow = WorkflowDefinition(
+            name="data_flow_test",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start", outputs=["output"]),
+                WorkflowTaskDefinition(name="end", task_type="end", inputs=["input"]),
+            ],
+            edges=[
+                WorkflowEdgeDefinition(
+                    from_node="start",
+                    to_node="end",
+                    data_mapping={"output": "input"},
+                )
+            ],
+            start_node="start",
+            end_nodes=["end"],
+        )
+        result = converter.to_dict(workflow)
+        # Verify data flow edges were created in the output
+        data_flow_connections = result.get("data_flow_connections", [])
+        assert len(data_flow_connections) >= 1
+        # Verify the data mapping was included
+        edge = data_flow_connections[0]
+        assert edge.get("source_output") == "output"
+        assert edge.get("destination_input") == "input"
+
+    def test_from_dict_creates_default_start_node(self) -> None:
+        """Test from_dict creates start node when none exists."""
+        converter = FlowConverter()
+        flow_dict = {
+            "component_type": "Flow",
+            "name": "no_start_test",
+            "nodes": [],
+            "control_flow_connections": [],
+            "data_flow_connections": [],
+        }
+        result = converter.from_dict(flow_dict)
+        # Should have a default start node created
+        assert result.start_node is not None
+
+    def test_from_dict_with_subflows(self) -> None:
+        """Test from_dict extracts subflows from referenced components."""
+        converter = FlowConverter()
+        flow_dict = {
+            "component_type": "Flow",
+            "name": "parent_flow",
+            "nodes": [
+                {"component_type": "StartNode", "id": "s1", "name": "start"},
+                {"component_type": "FlowNode", "id": "f1", "name": "subflow_call"},
+            ],
+            "$referenced_components": {
+                "child_flow": {
+                    "component_type": "Flow",
+                    "name": "child_flow",
+                    "nodes": [{"component_type": "StartNode", "id": "cs1", "name": "start"}],
+                    "control_flow_connections": [],
+                    "data_flow_connections": [],
+                }
+            },
+            "control_flow_connections": [],
+            "data_flow_connections": [],
+            "start_node": {"$component_ref": "s1"},
+        }
+        result = converter.from_dict(flow_dict)
+        assert "child_flow" in result.subflows
+
+
+class TestNodeConverterCoverage:
+    """Additional tests to improve NodeConverter coverage."""
+
+    def test_to_oas_agent_node(self) -> None:
+        """Test to_oas for AgentNode task type."""
+        converter = NodeConverter()
+        task = WorkflowTaskDefinition(
+            name="agent_task",
+            task_type="agent",
+            config={"agent_config": {"name": "test_agent"}},
+        )
+        node = converter.to_oas(task)
+        # AgentNode falls back to LlmNode in current implementation
+        assert node.name == "agent_task"
+
+    def test_to_oas_flow_node(self) -> None:
+        """Test to_oas for FlowNode task type."""
+        converter = NodeConverter()
+        task = WorkflowTaskDefinition(
+            name="flow_task",
+            task_type="flow",
+            config={"flow_id": "child_flow"},
+        )
+        node = converter.to_oas(task)
+        # FlowNode falls back to LlmNode in current implementation
+        assert node.name == "flow_task"
+
+    def test_to_oas_map_node(self) -> None:
+        """Test to_oas for MapNode task type."""
+        converter = NodeConverter()
+        task = WorkflowTaskDefinition(
+            name="map_task",
+            task_type="map",
+            config={"inner_flow_id": "inner_flow", "parallel": True},
+        )
+        node = converter.to_oas(task)
+        assert node.name == "map_task"
+
+    def test_from_dict_flownode(self) -> None:
+        """Test from_dict with FlowNode."""
+        converter = NodeConverter()
+        node_dict = {
+            "component_type": "FlowNode",
+            "id": "f1",
+            "name": "flow_task",
+            "flow": {"$component_ref": "child_flow"},
+        }
+        result = converter.from_dict(node_dict)
+        assert result.task_type == "flow"
+        assert result.config.get("flow_id") == "child_flow"
+
+    def test_from_dict_mapnode(self) -> None:
+        """Test from_dict with MapNode."""
+        converter = NodeConverter()
+        node_dict = {
+            "component_type": "MapNode",
+            "id": "m1",
+            "name": "map_task",
+            "inner_flow": {"$component_ref": "inner_flow"},
+            "parallel": True,
+            "map_input_key": "items",
+            "map_item_key": "item",
+        }
+        result = converter.from_dict(node_dict)
+        assert result.task_type == "map"
+        assert result.config.get("inner_flow_id") == "inner_flow"
+        assert result.config.get("parallel") is True
+        assert result.config.get("map_input_key") == "items"
+
+    def test_to_dict_flow_task(self) -> None:
+        """Test to_dict for flow task type."""
+        converter = NodeConverter()
+        task = WorkflowTaskDefinition(
+            name="flow_task",
+            task_type="flow",
+            config={"flow_id": "child_flow"},
+        )
+        result = converter.to_dict(task)
+        assert result["component_type"] == "FlowNode"
+        assert result.get("subflow", {}).get("$component_ref") == "child_flow"
+
+    def test_to_dict_map_task(self) -> None:
+        """Test to_dict for map task type."""
+        converter = NodeConverter()
+        task = WorkflowTaskDefinition(
+            name="map_task",
+            task_type="map",
+            config={"inner_flow_id": "inner_flow", "parallel": True},
+        )
+        result = converter.to_dict(task)
+        assert result["component_type"] == "MapNode"
+        assert result["parallel"] is True
+
+    def test_extract_name_from_property_string(self) -> None:
+        """Test _extract_name_from_property with string input."""
+        converter = NodeConverter()
+        result = converter._extract_name_from_property("test_name")
+        assert result == "test_name"
+
+    def test_extract_name_from_property_dict_with_name(self) -> None:
+        """Test _extract_name_from_property with dict having name key."""
+        converter = NodeConverter()
+        result = converter._extract_name_from_property({"name": "prop_name"})
+        assert result == "prop_name"
+
+    def test_extract_name_from_property_object_with_name(self) -> None:
+        """Test _extract_name_from_property with object having name attr."""
+        converter = NodeConverter()
+
+        class PropObj:
+            name = "obj_name"
+
+        result = converter._extract_name_from_property(PropObj())
+        assert result == "obj_name"
+
+    def test_serialize_component_fallback(self) -> None:
+        """Test _serialize_component fallback paths."""
+        converter = NodeConverter()
+        # Simple dict-like object
+        result = converter._serialize_component({"key": "value"})
+        # Should handle dict input
+        assert isinstance(result, dict)
 
 
 class TestExceptions:

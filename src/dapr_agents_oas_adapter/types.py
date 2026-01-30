@@ -1,11 +1,11 @@
 """Type definitions and mappings for OAS <-> Dapr Agents conversion."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 # Type aliases for clarity
 type ToolRegistry = dict[str, Callable[..., Any]]
@@ -66,9 +66,10 @@ class OrchestratorType(str, Enum):
     ROUND_ROBIN = "RoundRobinOrchestrator"
 
 
-@dataclass
-class LlmClientConfig:
+class LlmClientConfig(BaseModel):
     """Configuration for Dapr LLM client."""
+
+    model_config = ConfigDict(extra="forbid")
 
     provider: str
     model_id: str
@@ -76,66 +77,76 @@ class LlmClientConfig:
     api_key: str | None = None
     temperature: float = 0.7
     max_tokens: int | None = None
-    extra_params: dict[str, Any] = field(default_factory=dict)
+    extra_params: dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
-class ToolDefinition:
+class ToolDefinition(BaseModel):
     """Definition for a converted tool."""
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     name: str
     description: str
-    inputs: list[PropertySchema]
-    outputs: list[PropertySchema]
-    implementation: Callable[..., Any] | None = None
+    inputs: list[PropertySchema] = Field(default_factory=list)
+    outputs: list[PropertySchema] = Field(default_factory=list)
+    # Callable can't be serialized to JSON schema, so exclude from schema generation
+    implementation: SkipJsonSchema[Callable[..., Any] | None] = None
     mcp_transport: dict[str, Any] | None = None  # MCP transport config (SSE/HTTP)
 
 
-@dataclass
-class WorkflowTaskDefinition:
+class WorkflowTaskDefinition(BaseModel):
     """Definition for a workflow task."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     task_type: str  # "llm", "tool", "agent", "flow"
-    config: dict[str, Any] = field(default_factory=dict)
-    inputs: list[str] = field(default_factory=list)
-    outputs: list[str] = field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    inputs: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(default_factory=list)
 
 
-@dataclass
-class WorkflowEdgeDefinition:
+class WorkflowEdgeDefinition(BaseModel):
     """Definition for workflow edges (control and data flow)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     from_node: str
     to_node: str
     from_branch: str | None = None
     condition: str | None = None
-    data_mapping: dict[str, str] = field(default_factory=dict)
+    data_mapping: dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class WorkflowDefinition:
+class WorkflowDefinition(BaseModel):
     """Definition for a converted workflow."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     description: str | None = None
-    tasks: list[WorkflowTaskDefinition] = field(default_factory=list)
-    edges: list[WorkflowEdgeDefinition] = field(default_factory=list)
+    flow_id: str | None = None
+    tasks: list[WorkflowTaskDefinition] = Field(default_factory=list)
+    edges: list[WorkflowEdgeDefinition] = Field(default_factory=list)
     start_node: str | None = None
-    end_nodes: list[str] = field(default_factory=list)
-    inputs: list[PropertySchema] = field(default_factory=list)
-    outputs: list[PropertySchema] = field(default_factory=list)
+    end_nodes: list[str] = Field(default_factory=list)
+    inputs: list[PropertySchema] = Field(default_factory=list)
+    outputs: list[PropertySchema] = Field(default_factory=list)
+    # Optional subflows referenced by FlowNode/MapNode (keyed by flow id).
+    subflows: dict[str, "WorkflowDefinition"] = Field(default_factory=dict)
 
 
 class DaprAgentConfig(BaseModel):
     """Configuration model for Dapr Agent creation."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     role: str | None = None
     goal: str | None = None
-    instructions: list[str] = []
+    instructions: list[str] = Field(default_factory=list)
     system_prompt: str | None = None
-    tools: list[str] = []
+    tools: list[str] = Field(default_factory=list)
     message_bus_name: str = "messagepubsub"
     state_store_name: str = "statestore"
     agents_registry_store_name: str = "agentsregistry"
@@ -143,8 +154,8 @@ class DaprAgentConfig(BaseModel):
     # Additional fields for type safety
     agent_type: str | None = None
     llm_config: dict[str, Any] | None = None
-    tool_definitions: list[dict[str, Any]] = []
-    input_variables: list[str] = []
+    tool_definitions: list[dict[str, Any]] = Field(default_factory=list)
+    input_variables: list[str] = Field(default_factory=list)
     # DurableAgent-specific configuration fields
     agent_topic: str | None = None
     broadcast_topic: str | None = None

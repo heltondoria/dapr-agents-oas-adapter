@@ -1,0 +1,9 @@
+version: 1
+
+apps:
+  - appID: message-workflow-client
+    appDirPath: .
+    command: ["uv", "run", "python", "message_client.py"]
+    resourcesPaths:
+      - ../../_shared/dapr/components/redis
+

@@ -1,0 +1,28 @@
+component_type: Agent
+id: agent_9845d1df
+name: PlannerAgent
+description: Create a concise 3-day trip outline for the given destination.
+metadata: null
+inputs: []
+outputs: []
+llm_config:
+  component_type: VllmConfig
+  id: llm_7b9823d9
+  name: default_llm
+  description: null
+  metadata: {}
+  default_generation_parameters: null
+  url: https://api.openai.com/v1
+  model_id: gpt-4
+system_prompt: 'You are Trip planner.
+
+  Your goal is to Create a concise 3-day trip outline for the given destination..
+
+
+  Instructions:
+
+  - Create a concise 3-day outline for the given destination.
+
+  - Balance culture, food, and leisure activities.'
+tools: []
+agentspec_version: 25.4.1

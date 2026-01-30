@@ -496,13 +496,17 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
 
         except ImportError as e:
             raise ConversionError(
-                f"Failed to import Dapr Agents: {e}. Make sure dapr-agents is installed.",
+                "Failed to import Dapr Agents",
                 config,
+                suggestion="Install dapr-agents: pip install dapr-agents",
+                caused_by=e,
             ) from e
         except Exception as e:
             raise ConversionError(
-                f"Failed to create Dapr Agent: {e}",
+                "Failed to create Dapr Agent",
                 config,
+                suggestion="Check agent configuration and ensure all required fields are set",
+                caused_by=e,
             ) from e
 
     def _create_llm_client(self, llm_config: dict[str, Any] | None) -> Any:
@@ -548,7 +552,9 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
         except ImportError as e:
             raise ConversionError(
-                f"Failed to import LLM client: {e}. Make sure dapr-agents is installed.",
+                "Failed to import LLM client",
+                suggestion="Install dapr-agents: pip install dapr-agents",
+                caused_by=e,
             ) from e
 
     def _determine_agent_type(self, component: OASAgent) -> DaprAgentType:

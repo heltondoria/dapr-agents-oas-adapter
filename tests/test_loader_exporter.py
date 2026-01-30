@@ -1193,3 +1193,335 @@ class TestLoaderExporterIntegration:
         assert isinstance(loaded, WorkflowDefinition)
         assert loaded.name == original.name
         assert loaded.description == original.description
+
+
+# =============================================================================
+# StrictLoader Tests (RF-010)
+# =============================================================================
+
+
+class TestStrictLoader:
+    """Tests for StrictLoader class (RF-010)."""
+
+    def test_init_creates_internal_loader(self) -> None:
+        """Test StrictLoader creates internal DaprAgentSpecLoader."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        assert loader.loader is not None
+        assert isinstance(loader.loader, DaprAgentSpecLoader)
+
+    def test_init_with_tool_registry(self) -> None:
+        """Test StrictLoader initialization with tool registry."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        def my_tool() -> str:
+            return "result"
+
+        loader = StrictLoader(tool_registry={"my_tool": my_tool})
+        assert "my_tool" in loader.tool_registry
+
+    def test_tool_registry_setter(self) -> None:
+        """Test tool_registry setter updates underlying loader."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+
+        def new_tool() -> str:
+            return "new"
+
+        new_registry = {"new_tool": new_tool}
+        loader.tool_registry = new_registry
+        assert loader.tool_registry == new_registry
+
+    def test_register_tool(self) -> None:
+        """Test register_tool delegates to underlying loader."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        def search(query: str) -> list[str]:
+            return [query]
+
+        loader = StrictLoader()
+        loader.register_tool("search", search)
+        assert "search" in loader.tool_registry
+
+    def test_load_dict_valid_agent(self) -> None:
+        """Test loading valid agent dict with validation."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        agent_dict = {
+            "component_type": "Agent",
+            "name": "test_agent",
+            "description": "Test agent",
+            "system_prompt": "You are helpful.",
+            "llm_config": {
+                "component_type": "OpenAIConfig",
+                "model_id": "gpt-4",
+            },
+            "tools": [],
+        }
+        result = loader.load_dict(agent_dict)
+        assert isinstance(result, DaprAgentConfig)
+        assert result.name == "test_agent"
+
+    def test_load_dict_valid_flow(self) -> None:
+        """Test loading valid flow dict with validation."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        flow_dict = {
+            "component_type": "Flow",
+            "name": "test_flow",
+            "description": "Test flow",
+            "nodes": [
+                {
+                    "component_type": "StartNode",
+                    "id": "start",
+                    "name": "start",
+                    "inputs": [],
+                    "outputs": [],
+                }
+            ],
+            "control_flow_connections": [],
+            "data_flow_connections": [],
+        }
+        result = loader.load_dict(flow_dict)
+        assert isinstance(result, WorkflowDefinition)
+        assert result.name == "test_flow"
+
+    def test_load_dict_invalid_raises_validation_error(self) -> None:
+        """Test loading invalid dict raises OASSchemaValidationError."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+        from dapr_agents_oas_adapter.validation import OASSchemaValidationError
+
+        loader = StrictLoader()
+        invalid_dict = {"component_type": "Agent"}  # Missing required 'name'
+
+        with pytest.raises(OASSchemaValidationError) as exc_info:
+            loader.load_dict(invalid_dict)
+        assert len(exc_info.value.issues) > 0
+        assert any("name" in str(issue).lower() for issue in exc_info.value.issues)
+
+    def test_load_dict_skip_validation(self) -> None:
+        """Test loading dict with validation disabled."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        agent_dict = {
+            "component_type": "Agent",
+            "name": "test_agent",
+            "description": "Test",
+            "system_prompt": "",
+            "tools": [],
+        }
+        # Should succeed with validate=False
+        result = loader.load_dict(agent_dict, validate=False)
+        assert isinstance(result, DaprAgentConfig)
+
+    def test_validate_dict_returns_result(self) -> None:
+        """Test validate_dict returns ValidationResult without loading."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+        from dapr_agents_oas_adapter.validation import ValidationResult
+
+        loader = StrictLoader()
+        agent_dict = {"component_type": "Agent", "name": "test"}
+        result = loader.validate_dict(agent_dict)
+        assert isinstance(result, ValidationResult)
+        assert result.is_valid is True
+
+    def test_validate_dict_invalid_returns_errors(self) -> None:
+        """Test validate_dict returns errors for invalid dict."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        invalid_dict = {"component_type": "Agent"}  # Missing name
+        result = loader.validate_dict(invalid_dict)
+        assert result.is_valid is False
+        assert len(result.errors) > 0
+
+    def test_load_json_valid(self) -> None:
+        """Test loading valid JSON string with validation."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        json_content = """{
+            "component_type": "Agent",
+            "name": "json_agent",
+            "description": "Test",
+            "system_prompt": "",
+            "tools": []
+        }"""
+        result = loader.load_json(json_content)
+        assert isinstance(result, DaprAgentConfig)
+        assert result.name == "json_agent"
+
+    def test_load_json_invalid_raises_error(self) -> None:
+        """Test loading invalid JSON raises OASSchemaValidationError."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+        from dapr_agents_oas_adapter.validation import OASSchemaValidationError
+
+        loader = StrictLoader()
+        json_content = '{"component_type": "Agent"}'  # Missing name
+
+        with pytest.raises(OASSchemaValidationError):
+            loader.load_json(json_content)
+
+    def test_load_json_invalid_syntax_raises_conversion_error(self) -> None:
+        """Test loading invalid JSON syntax raises ConversionError."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+
+        with pytest.raises(ConversionError) as exc_info:
+            loader.load_json("not valid json")
+        assert "Invalid JSON" in str(exc_info.value)
+
+    def test_load_json_skip_validation(self) -> None:
+        """Test loading JSON with validation disabled."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        # This would fail validation (missing name), but we skip it
+        json_content = """{
+            "component_type": "Agent",
+            "id": "agent_1",
+            "name": "test",
+            "description": "Test",
+            "system_prompt": "",
+            "llm_config": {
+                "component_type": "VllmConfig",
+                "id": "llm_1",
+                "name": "test_llm",
+                "model_id": "gpt-4",
+                "url": "http://localhost:8000"
+            },
+            "tools": [],
+            "inputs": [],
+            "outputs": [],
+            "agentspec_version": "25.4.1"
+        }"""
+        result = loader.load_json(json_content, validate=False)
+        assert isinstance(result, DaprAgentConfig)
+
+    def test_load_yaml_valid(self) -> None:
+        """Test loading valid YAML string with validation."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        yaml_content = """
+component_type: Agent
+name: yaml_agent
+description: Test
+system_prompt: ""
+tools: []
+"""
+        result = loader.load_yaml(yaml_content)
+        assert isinstance(result, DaprAgentConfig)
+        assert result.name == "yaml_agent"
+
+    def test_load_yaml_invalid_raises_error(self) -> None:
+        """Test loading invalid YAML raises OASSchemaValidationError."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+        from dapr_agents_oas_adapter.validation import OASSchemaValidationError
+
+        loader = StrictLoader()
+        yaml_content = """
+component_type: Agent
+description: No name field
+"""
+        with pytest.raises(OASSchemaValidationError):
+            loader.load_yaml(yaml_content)
+
+    def test_load_yaml_invalid_syntax_raises_conversion_error(self) -> None:
+        """Test loading invalid YAML syntax raises ConversionError."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+
+        with pytest.raises(ConversionError) as exc_info:
+            loader.load_yaml("invalid: yaml: content:")
+        assert "Invalid YAML" in str(exc_info.value)
+
+    def test_load_yaml_skip_validation(self) -> None:
+        """Test loading YAML with validation disabled."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        yaml_content = """
+component_type: Agent
+id: agent_1
+name: skip_valid_agent
+description: Test
+system_prompt: ""
+llm_config:
+  component_type: VllmConfig
+  id: llm_1
+  name: test_llm
+  model_id: gpt-4
+  url: http://localhost:8000
+tools: []
+inputs: []
+outputs: []
+agentspec_version: "25.4.1"
+"""
+        result = loader.load_yaml(yaml_content, validate=False)
+        assert isinstance(result, DaprAgentConfig)
+
+    def test_create_agent_delegates_to_loader(self) -> None:
+        """Test create_agent delegates to underlying loader."""
+        from unittest.mock import MagicMock, patch
+
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        config = DaprAgentConfig(
+            name="test_agent",
+            role="Helper",
+            instructions=["Be helpful"],
+            tools=[],
+        )
+
+        mock_assistant = MagicMock()
+        with patch.dict(
+            "sys.modules",
+            {
+                "dapr_agents": MagicMock(
+                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    tool=MagicMock(side_effect=lambda f: f),
+                ),
+            },
+        ):
+            result = loader.create_agent(config)
+            assert result is mock_assistant
+
+    def test_create_workflow_delegates_to_loader(self) -> None:
+        """Test create_workflow delegates to underlying loader."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+
+        loader = StrictLoader()
+        workflow_def = WorkflowDefinition(
+            name="test_workflow",
+            tasks=[
+                WorkflowTaskDefinition(name="start", task_type="start"),
+                WorkflowTaskDefinition(name="end", task_type="end"),
+            ],
+            edges=[WorkflowEdgeDefinition(from_node="start", to_node="end")],
+            start_node="start",
+            end_nodes=["end"],
+        )
+        result = loader.create_workflow(workflow_def)
+        assert callable(result)
+        assert result.__name__ == "test_workflow"
+
+    def test_unknown_component_type_raises_validation_error(self) -> None:
+        """Test loading unknown component type raises validation error."""
+        from dapr_agents_oas_adapter.loader import StrictLoader
+        from dapr_agents_oas_adapter.validation import OASSchemaValidationError
+
+        loader = StrictLoader()
+        unknown_dict = {"component_type": "Unknown", "name": "test"}
+
+        with pytest.raises(OASSchemaValidationError) as exc_info:
+            loader.load_dict(unknown_dict)
+        assert any("component_type" in str(issue).lower() for issue in exc_info.value.issues)
