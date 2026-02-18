@@ -6,15 +6,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dapr_agents_oas_adapter.converters.agent import AgentConverter
-from dapr_agents_oas_adapter.converters.base import (
-    ConversionError,
-    ConverterRegistry,
-    ValidationError,
-)
+from dapr_agents_oas_adapter.converters.base import ConverterRegistry
 from dapr_agents_oas_adapter.converters.flow import FlowConverter
 from dapr_agents_oas_adapter.converters.llm import LlmConfigConverter
 from dapr_agents_oas_adapter.converters.node import NodeConverter
 from dapr_agents_oas_adapter.converters.tool import MCPToolConverter, ToolConverter
+from dapr_agents_oas_adapter.exceptions import (
+    ConversionError,
+    DaprAgentsOasAdapterError,
+    ValidationError,
+)
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
@@ -35,7 +36,7 @@ class TestConversionError:
         assert "Something went wrong" in str(error)
         assert error.component is None
         assert error.suggestion is None
-        assert error.caused_by is None
+        assert error.__cause__ is None
 
     def test_error_with_component(self) -> None:
         """Test error includes component info."""
@@ -66,33 +67,26 @@ class TestConversionError:
         assert "Invalid component" in message
         assert "Suggestion: Check the component_type field" in message
 
-    def test_error_with_caused_by(self) -> None:
-        """Test error includes cause information."""
+    def test_error_with_cause_via_from(self) -> None:
+        """Test error preserves cause via 'from e' chaining."""
         cause = ValueError("Invalid value")
-        error = ConversionError(
-            "Processing failed",
-            caused_by=cause,
-        )
-        message = str(error)
-        assert "Processing failed" in message
-        assert "Caused by: ValueError: Invalid value" in message
+        with pytest.raises(ConversionError, match="Processing failed") as exc_info:
+            raise ConversionError("Processing failed") from cause
+        assert exc_info.value.__cause__ is cause
 
     def test_error_full_context(self) -> None:
         """Test error with all context information."""
         component = {"name": "workflow1", "component_type": "Flow"}
-        cause = KeyError("missing_field")
         error = ConversionError(
             "Workflow conversion failed",
             component,
             suggestion="Ensure all required fields are present",
-            caused_by=cause,
         )
         message = str(error)
         assert "Workflow conversion failed" in message
         assert "type=Flow" in message
         assert "name=workflow1" in message
         assert "Suggestion: Ensure all required fields are present" in message
-        assert "Caused by: KeyError" in message
 
     def test_base_message_property(self) -> None:
         """Test base_message returns original message."""
@@ -113,13 +107,13 @@ class TestConversionError:
         assert new_error.component == original.component
 
     def test_with_cause_creates_new_error(self) -> None:
-        """Test with_cause creates a new error."""
+        """Test with_cause creates a new error with __cause__ set."""
         original = ConversionError("Error", suggestion="Check inputs")
         cause = RuntimeError("Root cause")
         new_error = original.with_cause(cause)
 
         assert new_error is not original
-        assert "Caused by: RuntimeError" in str(new_error)
+        assert new_error.__cause__ is cause
         assert new_error.suggestion == original.suggestion
 
     def test_error_with_component_without_name(self) -> None:
@@ -143,7 +137,7 @@ class TestLlmConfigConverter:
     def test_can_convert_llm_client_config(self) -> None:
         """Test can_convert with LlmClientConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(provider="openai", model_id="gpt-4")
+        config = LlmClientConfig(provider="openai", model_name="gpt-4")
         assert converter.can_convert(config) is True
 
     def test_can_convert_dict(self) -> None:
@@ -180,7 +174,7 @@ class TestLlmConfigConverter:
         }
         result = converter.from_dict(config_dict)
         assert result.provider == "openai"
-        assert result.model_id == "gpt-4"
+        assert result.model_name == "gpt-4"
         assert result.temperature == 0.5
         assert result.max_tokens == 1000
 
@@ -194,7 +188,7 @@ class TestLlmConfigConverter:
         }
         result = converter.from_dict(config_dict)
         assert result.provider == "vllm"
-        assert result.model_id == "llama-3"
+        assert result.model_name == "llama-3"
         assert result.url == "http://localhost:8000"
 
     def test_from_dict_ollama(self) -> None:
@@ -227,7 +221,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="vllm",
-            model_id="llama-3",
+            model_name="llama-3",
             url="http://localhost:8000",
             temperature=0.8,
         )
@@ -241,7 +235,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
             api_key="sk-test",
         )
         result = converter.to_dict(config)
@@ -253,7 +247,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="ollama",
-            model_id="llama2",
+            model_name="llama2",
             url="http://localhost:11434",
         )
         result = converter.to_dict(config)
@@ -264,7 +258,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
             temperature=0.5,
             max_tokens=2000,
             extra_params={"top_p": 0.9},
@@ -280,7 +274,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
             temperature=0.7,  # Default, not included
         )
         result = converter.to_dict(config)
@@ -300,7 +294,7 @@ class TestLlmConfigConverter:
 
         result = converter.from_oas(mock_config)
         assert result.provider == "vllm"
-        assert result.model_id == "llama-3"
+        assert result.model_name == "llama-3"
         assert result.url == "http://localhost:8000"
 
     def test_from_oas_openai_config(self) -> None:
@@ -316,7 +310,7 @@ class TestLlmConfigConverter:
 
         result = converter.from_oas(mock_config)
         assert result.provider == "openai"
-        assert result.model_id == "gpt-4"
+        assert result.model_name == "gpt-4"
         assert result.api_key == "sk-test"
         assert result.temperature == 0.5
 
@@ -387,7 +381,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="vllm",
-            model_id="llama-3",
+            model_name="llama-3",
             url="http://localhost:8000",
         )
 
@@ -403,7 +397,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
         )
 
         result = converter.to_oas(config)
@@ -417,7 +411,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="ollama",
-            model_id="llama2",
+            model_name="llama2",
             url="http://localhost:11434",
         )
 
@@ -433,7 +427,7 @@ class TestLlmConfigConverter:
         converter = LlmConfigConverter()
         config = LlmClientConfig(
             provider="unsupported",
-            model_id="model",
+            model_name="model",
         )
 
         with pytest.raises(ConversionError) as exc_info:
@@ -522,7 +516,6 @@ class TestToolConverter:
 
         def void_func(x: str) -> None:
             """Void function."""
-            pass
 
         converter = ToolConverter()
         tool_def = converter.from_callable(void_func)
@@ -851,9 +844,9 @@ class TestMCPToolConverter:
 
         result = converter.from_dict(tool_dict)
         assert result.name == "search_tool"
-        assert result.mcp_transport is not None
-        assert result.mcp_transport["type"] == "SSETransport"
-        assert result.mcp_transport["url"] == "http://localhost:8080/sse"
+        assert result.transport_config is not None
+        assert result.transport_config["type"] == "SSETransport"
+        assert result.transport_config["url"] == "http://localhost:8080/sse"
 
     def test_from_dict_mcp_tool_with_headers_and_session(self) -> None:
         """Test from_dict extracts headers and session_parameters."""
@@ -875,9 +868,9 @@ class TestMCPToolConverter:
         }
 
         result = converter.from_dict(tool_dict)
-        assert result.mcp_transport is not None
-        assert result.mcp_transport["headers"] == {"Authorization": "Bearer token123"}
-        assert result.mcp_transport["session_parameters"] == {"timeout": 60, "retry": 3}
+        assert result.transport_config is not None
+        assert result.transport_config["headers"] == {"Authorization": "Bearer token123"}
+        assert result.transport_config["session_parameters"] == {"timeout": 60, "retry": 3}
 
     def test_to_dict_mcp_tool_preserves_transport(self) -> None:
         """Test to_dict exports MCPTool with client_transport."""
@@ -888,7 +881,7 @@ class TestMCPToolConverter:
             description="Search via MCP server",
             inputs=[{"title": "query", "type": "string"}],
             outputs=[{"title": "results", "type": "array"}],
-            mcp_transport={
+            transport_config={
                 "type": "SSETransport",
                 "url": "http://localhost:8080/sse",
                 "headers": {"X-API-Key": "secret"},
@@ -948,7 +941,7 @@ class TestMCPToolConverter:
         }
 
         tool_def = converter.from_dict(tool_dict)
-        assert tool_def.mcp_transport is not None  # Should NOT be None
+        assert tool_def.transport_config is not None  # Should NOT be None
 
         # Roundtrip should preserve MCPTool type
         result_dict = converter.to_dict(tool_def)
@@ -963,7 +956,7 @@ class TestMCPToolConverter:
             description="Tool with empty headers/session",
             inputs=[],
             outputs=[],
-            mcp_transport={
+            transport_config={
                 "type": "SSETransport",
                 "url": "http://localhost:8080/sse",
                 "headers": {},  # Explicitly empty
@@ -991,7 +984,7 @@ class TestMCPToolConverter:
 
         result = converter.from_dict(tool_dict)
         assert result.name == "server_tool"
-        assert result.mcp_transport is None
+        assert result.transport_config is None
 
     def test_to_dict_server_tool_no_transport(self) -> None:
         """Test to_dict exports ServerTool when no mcp_transport."""
@@ -1002,7 +995,7 @@ class TestMCPToolConverter:
             description="A simple server tool",
             inputs=[],
             outputs=[],
-            mcp_transport=None,
+            transport_config=None,
         )
 
         result = converter.to_dict(tool_def)
@@ -2022,7 +2015,7 @@ class TestAgentConverter:
             import sys
 
             mock_openai = MagicMock()
-            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
             dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
@@ -2040,7 +2033,7 @@ class TestAgentConverter:
             import sys
 
             mock_openai = MagicMock()
-            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
             dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
@@ -2058,7 +2051,7 @@ class TestAgentConverter:
             import sys
 
             mock_openai = MagicMock()
-            dapr_agents_module = cast(Any, sys.modules["dapr_agents"])
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
             dapr_agents_module.OpenAIChatClient = mock_openai
 
             converter._create_llm_client(llm_config)
@@ -3683,7 +3676,7 @@ class TestConverterRegistry:
         registry.register(llm_converter)
         registry.register(tool_converter)
 
-        config = LlmClientConfig(provider="openai", model_id="gpt-4")
+        config = LlmClientConfig(provider="openai", model_name="gpt-4")
         found = registry.get_converter(config)
         assert found is llm_converter
 
@@ -3711,7 +3704,7 @@ class TestConverterRegistry:
 
         result = registry.convert_from_oas(config)
         assert isinstance(result, LlmClientConfig)
-        assert result.model_id == "llama"
+        assert result.model_name == "llama"
 
     def test_convert_from_oas_no_converter(self) -> None:
         """Test convert_from_oas raises error when no converter found."""
@@ -3729,7 +3722,7 @@ class TestConverterRegistry:
 
         config = LlmClientConfig(
             provider="vllm",
-            model_id="llama",
+            model_name="llama",
             url="http://localhost:8000",
         )
 
@@ -4232,6 +4225,16 @@ class TestExceptions:
 
     def test_validation_error(self) -> None:
         """Test ValidationError exception."""
-        error = ValidationError("Invalid field", field="name")
+        error = ValidationError("Invalid field", field_path="name")
         assert "Invalid field" in str(error)
-        assert error.field == "name"
+        assert error.field_path == "name"
+
+    def test_conversion_error_is_subclass_of_base(self) -> None:
+        """Test ConversionError inherits from DaprAgentsOasAdapterError."""
+        error = ConversionError("test")
+        assert isinstance(error, DaprAgentsOasAdapterError)
+
+    def test_validation_error_is_subclass_of_base(self) -> None:
+        """Test ValidationError inherits from DaprAgentsOasAdapterError."""
+        error = ValidationError("test")
+        assert isinstance(error, DaprAgentsOasAdapterError)

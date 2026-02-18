@@ -1,7 +1,11 @@
 """Tests for StateSchemaBuilder module."""
 
+from typing import TYPE_CHECKING
+
 from dapr_agents_oas_adapter.state import StateSchemaBuilder
-from dapr_agents_oas_adapter.types import PropertySchema
+
+if TYPE_CHECKING:
+    from dapr_agents_oas_adapter.types import PropertySchema
 
 
 class TestStateSchemaBuilder:

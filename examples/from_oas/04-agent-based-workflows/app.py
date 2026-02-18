@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 import dapr.ext.workflow as wf
-from dapr.ext.workflow import DaprWorkflowContext
 from dapr_agents.workflow.decorators import agent_activity
 
 
@@ -23,10 +22,15 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
-from dapr_agents_oas_adapter import DaprAgentSpecLoader  # noqa: E402
-from dapr_agents_oas_adapter.types import DaprAgentConfig  # noqa: E402
-from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
-from examples._shared.paths import find_repo_root  # noqa: E402
+from typing import TYPE_CHECKING
+
+from dapr_agents_oas_adapter import DaprAgentSpecLoader
+from dapr_agents_oas_adapter.types import DaprAgentConfig
+from examples._shared.optional_dotenv import try_load_dotenv
+from examples._shared.paths import find_repo_root
+
+if TYPE_CHECKING:
+    from dapr.ext.workflow import DaprWorkflowContext
 
 try_load_dotenv()
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
 
+from dapr_agents_oas_adapter.exceptions import ValidationError as _BaseValidationError
 from dapr_agents_oas_adapter.types import (
     WorkflowDefinition,
     WorkflowEdgeDefinition,
@@ -106,7 +107,7 @@ class ValidationResult:
             raise WorkflowValidationError(self.errors)
 
 
-class WorkflowValidationError(Exception):
+class WorkflowValidationError(_BaseValidationError):
     """Exception raised when workflow validation fails."""
 
     def __init__(self, issues: list[ValidationIssue]) -> None:
@@ -476,7 +477,7 @@ def validate_workflow_dict(
 # =============================================================================
 
 
-class OASSchemaValidationError(Exception):
+class OASSchemaValidationError(_BaseValidationError):
     """Exception raised when OAS schema validation fails."""
 
     def __init__(self, issues: list[ValidationIssue]) -> None:
@@ -565,18 +566,17 @@ class OASSchemaValidator:
 
         if component_type == "Agent":
             return self.validate_agent(data, raise_on_error=raise_on_error)
-        elif component_type == "Flow":
+        if component_type == "Flow":
             return self.validate_flow(data, raise_on_error=raise_on_error)
-        else:
-            result = ValidationResult()
-            result.add_error(
-                f"Unknown or missing component_type: '{component_type}'",
-                field="component_type",
-                suggestion="Set component_type to 'Agent' or 'Flow'",
-            )
-            if raise_on_error:
-                raise OASSchemaValidationError(result.errors)
-            return result
+        result = ValidationResult()
+        result.add_error(
+            f"Unknown or missing component_type: '{component_type}'",
+            field="component_type",
+            suggestion="Set component_type to 'Agent' or 'Flow'",
+        )
+        if raise_on_error:
+            raise OASSchemaValidationError(result.errors)
+        return result
 
     def validate_agent(
         self,

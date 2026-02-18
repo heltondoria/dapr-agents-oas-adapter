@@ -52,10 +52,10 @@ class TestLlmClientConfig:
         """Test default values for LLM client config."""
         config = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
         )
         assert config.provider == "openai"
-        assert config.model_id == "gpt-4"
+        assert config.model_name == "gpt-4"
         assert config.url is None
         assert config.api_key is None
         assert config.temperature == 0.7
@@ -66,7 +66,7 @@ class TestLlmClientConfig:
         """Test LLM client config with all values."""
         config = LlmClientConfig(
             provider="vllm",
-            model_id="llama-3",
+            model_name="llama-3",
             url="http://localhost:8000",
             api_key="secret",
             temperature=0.5,
@@ -74,7 +74,7 @@ class TestLlmClientConfig:
             extra_params={"top_p": 0.9},
         )
         assert config.provider == "vllm"
-        assert config.model_id == "llama-3"
+        assert config.model_name == "llama-3"
         assert config.url == "http://localhost:8000"
         assert config.api_key == "secret"
         assert config.temperature == 0.5
@@ -236,16 +236,16 @@ class TestPydanticFeatures:
         schema = LlmClientConfig.model_json_schema()
         assert schema["type"] == "object"
         assert "provider" in schema["properties"]
-        assert "model_id" in schema["properties"]
+        assert "model_name" in schema["properties"]
         assert "provider" in schema["required"]
-        assert "model_id" in schema["required"]
+        assert "model_name" in schema["required"]
 
     def test_llm_client_config_rejects_extra_fields(self) -> None:
         """Verify LlmClientConfig rejects unknown fields."""
         with pytest.raises(ValidationError) as exc_info:
             LlmClientConfig(
                 provider="openai",
-                model_id="gpt-4",
+                model_name="gpt-4",
                 unknown_field="should_fail",  # type: ignore[call-arg]
             )
         assert "extra" in str(exc_info.value).lower()
@@ -257,7 +257,7 @@ class TestPydanticFeatures:
         errors = exc_info.value.errors()
         field_names = [e["loc"][0] for e in errors]
         assert "provider" in field_names
-        assert "model_id" in field_names
+        assert "model_name" in field_names
 
     def test_tool_definition_model_json_schema(self) -> None:
         """Verify ToolDefinition generates valid JSON schema."""
@@ -380,7 +380,7 @@ class TestPydanticFeatures:
         """Verify models can be serialized to JSON and back."""
         original = LlmClientConfig(
             provider="openai",
-            model_id="gpt-4",
+            model_name="gpt-4",
             temperature=0.5,
             extra_params={"top_p": 0.9},
         )
@@ -390,6 +390,27 @@ class TestPydanticFeatures:
         restored = LlmClientConfig.model_validate_json(json_str)
 
         assert restored.provider == original.provider
-        assert restored.model_id == original.model_id
+        assert restored.model_name == original.model_name
         assert restored.temperature == original.temperature
         assert restored.extra_params == original.extra_params
+
+
+class TestFrozenModels:
+    """Tests for frozen model immutability."""
+
+    def test_llm_client_config_frozen_raises_validation_error(self) -> None:
+        """Verify assigning to a field on a frozen LlmClientConfig raises ValidationError."""
+        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        with pytest.raises(ValidationError):
+            config.provider = "ollama"  # type: ignore[misc]
+
+    def test_dapr_agent_config_frozen_raises_validation_error(self) -> None:
+        """Verify assigning to a field on a frozen DaprAgentConfig raises ValidationError."""
+        config = DaprAgentConfig(name="test_agent")
+        with pytest.raises(ValidationError):
+            config.name = "new_name"  # type: ignore[misc]
+
+    def test_tool_definition_default_tool_type(self) -> None:
+        """Verify ToolDefinition has default tool_type of 'function'."""
+        tool = ToolDefinition(name="test", description="test tool")
+        assert tool.tool_type == "function"

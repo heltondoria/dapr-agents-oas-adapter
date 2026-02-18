@@ -15,18 +15,14 @@ from dapr_agents_oas_adapter.cache import (
     CacheStats,
     InMemoryCache,
 )
+from dapr_agents_oas_adapter.exceptions import (
+    ConversionError,
+    DaprAgentsOasAdapterError,
+    ValidationError,
+)
 from dapr_agents_oas_adapter.exporter import DaprAgentSpecExporter
 from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader, StrictLoader
-from dapr_agents_oas_adapter.logging import (
-    LoggingMixin,
-    bind_context,
-    clear_context,
-    configure_logging,
-    get_logger,
-    log_context,
-    log_operation,
-    unbind_context,
-)
+from dapr_agents_oas_adapter.logging import get_logger, set_logger
 from dapr_agents_oas_adapter.utils import IDGenerator
 from dapr_agents_oas_adapter.validation import (
     OASSchemaValidationError,
@@ -44,25 +40,22 @@ __all__ = [
     "CacheBackend",
     "CacheStats",
     "CachedLoader",
+    "ConversionError",
     "DaprAgentSpecExporter",
     "DaprAgentSpecLoader",
+    "DaprAgentsOasAdapterError",
     "IDGenerator",
     "InMemoryCache",
-    "LoggingMixin",
     "OASSchemaValidationError",
     "OASSchemaValidator",
     "StrictLoader",
+    "ValidationError",
     "ValidationResult",
     "WorkflowValidationError",
     "WorkflowValidator",
-    "bind_context",
-    "clear_context",
-    "configure_logging",
     "get_logger",
-    "log_context",
-    "log_operation",
     "run_sync",
-    "unbind_context",
+    "set_logger",
     "validate_oas_dict",
     "validate_workflow",
 ]

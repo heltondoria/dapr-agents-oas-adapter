@@ -224,7 +224,7 @@ def get_nested_value(data: dict[str, Any], path: str, default: Any = None) -> An
 
     Args:
         data: Dictionary to extract value from
-        path: Dot-separated path (e.g., "llm_config.model_id")
+        path: Dot-separated path (e.g., "llm_config.model_name")
         default: Default value if path not found
 
     Returns:
@@ -245,7 +245,7 @@ def set_nested_value(data: dict[str, Any], path: str, value: Any) -> None:
 
     Args:
         data: Dictionary to set value in
-        path: Dot-separated path (e.g., "llm_config.model_id")
+        path: Dot-separated path (e.g., "llm_config.model_name")
         value: Value to set
     """
     keys = path.split(".")

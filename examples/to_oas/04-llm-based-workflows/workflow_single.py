@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 import dapr.ext.workflow as wf
-from dapr.ext.workflow import DaprWorkflowContext
 from dapr_agents.llm.dapr import DaprChatClient
 from dapr_agents.workflow.decorators import llm_activity
 
@@ -23,7 +22,12 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
-from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
+from typing import TYPE_CHECKING
+
+from examples._shared.optional_dotenv import try_load_dotenv
+
+if TYPE_CHECKING:
+    from dapr.ext.workflow import DaprWorkflowContext
 
 try_load_dotenv()
 
@@ -51,22 +55,12 @@ def _run() -> None:
 
     client = wf.DaprWorkflowClient()
     instance_id = client.schedule_new_workflow(workflow=single_task_workflow, input="Grace Hopper")
-    print(f"Workflow started: {instance_id}")
 
     state = client.wait_for_workflow_completion(instance_id)
-    if not state:
-        print("No state returned (instance may not exist).")
-    elif state.runtime_status.name == "COMPLETED":
-        print(f"Grace Hopper bio:\n{state.serialized_output}")
+    if not state or state.runtime_status.name == "COMPLETED" or state.failure_details:
+        pass
     else:
-        print(f"Workflow ended with status: {state.runtime_status}")
-        if state.failure_details:
-            fd = state.failure_details
-            print("Failure type:", fd.error_type)
-            print("Failure message:", fd.message)
-            print("Stack trace:\n", fd.stack_trace)
-        else:
-            print("Custom status:", state.serialized_custom_status)
+        pass
 
     runtime.shutdown()
 

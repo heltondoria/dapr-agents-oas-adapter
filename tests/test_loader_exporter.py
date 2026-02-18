@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dapr_agents_oas_adapter.converters.base import ConversionError
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.exporter import DaprAgentSpecExporter
 from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 from dapr_agents_oas_adapter.types import (

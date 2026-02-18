@@ -6,18 +6,20 @@ Provides async versions of loading operations for concurrent processing.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dapr_agents_oas_adapter.logging import get_logger, log_operation
-from dapr_agents_oas_adapter.types import (
-    DaprAgentConfig,
-    NamedCallable,
-    ToolRegistry,
-    WorkflowDefinition,
-)
+from dapr_agents_oas_adapter.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from dapr_agents_oas_adapter.types import (
+        DaprAgentConfig,
+        NamedCallable,
+        ToolRegistry,
+        WorkflowDefinition,
+    )
 
 
 class AsyncDaprAgentSpecLoader:
@@ -26,8 +28,8 @@ class AsyncDaprAgentSpecLoader:
     This class provides async methods to load OAS (Open Agent Spec) configurations
     from JSON or YAML format and convert them to Dapr Agents components.
 
-    The async operations use a thread pool executor for file I/O operations
-    while keeping the conversion logic synchronous (since it's CPU-bound).
+    The async operations use ``asyncio.to_thread`` for offloading synchronous
+    conversion logic to a thread.
 
     Example:
         ```python
@@ -50,23 +52,18 @@ class AsyncDaprAgentSpecLoader:
     def __init__(
         self,
         tool_registry: ToolRegistry | None = None,
-        *,
-        max_workers: int | None = None,
     ) -> None:
         """Initialize the async loader.
 
         Args:
             tool_registry: Dictionary mapping tool names to their callable
                           implementations.
-            max_workers: Maximum number of worker threads for file I/O
-                        (default: None, uses ThreadPoolExecutor default)
         """
         # Import here to avoid circular imports
         from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 
         self._sync_loader = DaprAgentSpecLoader(tool_registry)
-        self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._logger = get_logger("AsyncDaprAgentSpecLoader")
+        self._logger = get_logger()
 
     @property
     def tool_registry(self) -> ToolRegistry:
@@ -99,12 +96,7 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the JSON cannot be parsed or converted
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self._sync_loader.load_json,
-            json_content,
-        )
+        return await asyncio.to_thread(self._sync_loader.load_json, json_content)
 
     async def load_yaml(self, yaml_content: str) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from YAML string.
@@ -118,12 +110,7 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the YAML cannot be parsed or converted
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self._sync_loader.load_yaml,
-            yaml_content,
-        )
+        return await asyncio.to_thread(self._sync_loader.load_yaml, yaml_content)
 
     async def load_json_file(self, file_path: str | Path) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a JSON file.
@@ -137,17 +124,8 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the file cannot be read or converted
         """
-        with log_operation(
-            "async_load_json_file",
-            self._logger,
-            file_path=str(file_path),
-        ):
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                self._executor,
-                self._sync_loader.load_json_file,
-                file_path,
-            )
+        self._logger.info("async_load_json_file started", extra={"file_path": str(file_path)})
+        return await asyncio.to_thread(self._sync_loader.load_json_file, file_path)
 
     async def load_yaml_file(self, file_path: str | Path) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a YAML file.
@@ -161,17 +139,8 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the file cannot be read or converted
         """
-        with log_operation(
-            "async_load_yaml_file",
-            self._logger,
-            file_path=str(file_path),
-        ):
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                self._executor,
-                self._sync_loader.load_yaml_file,
-                file_path,
-            )
+        self._logger.info("async_load_yaml_file started", extra={"file_path": str(file_path)})
+        return await asyncio.to_thread(self._sync_loader.load_yaml_file, file_path)
 
     async def load_dict(self, spec_dict: dict[str, Any]) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a dictionary.
@@ -185,12 +154,7 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the component type is not supported
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self._sync_loader.load_dict,
-            spec_dict,
-        )
+        return await asyncio.to_thread(self._sync_loader.load_dict, spec_dict)
 
     async def load_component(self, component: Any) -> DaprAgentConfig | WorkflowDefinition:
         """Load a PyAgentSpec Component and convert to Dapr format.
@@ -204,12 +168,7 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If the component type is not supported
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self._sync_loader.load_component,
-            component,
-        )
+        return await asyncio.to_thread(self._sync_loader.load_component, component)
 
     async def create_agent(
         self,
@@ -228,11 +187,7 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If agent creation fails
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            lambda: self._sync_loader.create_agent(config, additional_tools),
-        )
+        return await asyncio.to_thread(self._sync_loader.create_agent, config, additional_tools)
 
     async def create_workflow(
         self,
@@ -251,10 +206,8 @@ class AsyncDaprAgentSpecLoader:
         Raises:
             ConversionError: If workflow creation fails
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            lambda: self._sync_loader.create_workflow(workflow_def, task_implementations),
+        return await asyncio.to_thread(
+            self._sync_loader.create_workflow, workflow_def, task_implementations
         )
 
     async def load_multiple_files(
@@ -279,12 +232,10 @@ class AsyncDaprAgentSpecLoader:
                 return await self.load_yaml_file(path)
             return await self.load_json_file(path)
 
-        with log_operation(
-            "async_load_multiple_files",
-            self._logger,
-            file_count=len(file_paths),
-        ):
-            return await asyncio.gather(*[load_file(p) for p in file_paths])
+        self._logger.info(
+            "async_load_multiple_files started", extra={"file_count": len(file_paths)}
+        )
+        return await asyncio.gather(*[load_file(p) for p in file_paths])
 
     def get_sync_loader(self) -> Any:
         """Get the underlying synchronous loader.
@@ -296,7 +247,6 @@ class AsyncDaprAgentSpecLoader:
 
     async def close(self) -> None:
         """Close the async loader and release resources."""
-        self._executor.shutdown(wait=False)
         self._logger.debug("async_loader_closed")
 
     async def __aenter__(self) -> AsyncDaprAgentSpecLoader:
@@ -340,11 +290,11 @@ def run_sync(coro: Any) -> Any:
     try:
         asyncio.get_running_loop()
         # Already in an async context, create a new thread to run it
-        import concurrent.futures
+        import concurrent.futures  # pragma: no cover
 
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
+        with concurrent.futures.ThreadPoolExecutor() as pool:  # pragma: no cover
+            future = pool.submit(asyncio.run, coro)  # pragma: no cover
+            return future.result()  # pragma: no cover
     except RuntimeError:
         # No running loop, create a new one
         return asyncio.run(coro)

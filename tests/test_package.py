@@ -51,6 +51,10 @@ def test_all_exports_match() -> None:
         "CacheBackend",
         "CacheStats",
         "InMemoryCache",
+        # Exceptions
+        "ConversionError",
+        "DaprAgentsOasAdapterError",
+        "ValidationError",
         # Validation
         "IDGenerator",
         "OASSchemaValidationError",
@@ -61,14 +65,8 @@ def test_all_exports_match() -> None:
         "validate_oas_dict",
         "validate_workflow",
         # Logging
-        "LoggingMixin",
-        "bind_context",
-        "clear_context",
-        "configure_logging",
         "get_logger",
-        "log_context",
-        "log_operation",
-        "unbind_context",
+        "set_logger",
         # Utilities
         "run_sync",
     }

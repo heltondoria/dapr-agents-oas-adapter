@@ -73,20 +73,10 @@ def main() -> int:
         workflow=workflow_func,
         input={"name": "Grace Hopper"},
     )
-    print(f"Workflow started: {instance_id}")
 
     state = client.wait_for_workflow_completion(instance_id)
-    if not state:
-        print("No state returned (instance may not exist).")
-    elif state.runtime_status.name == "COMPLETED":
-        print(f"Output:\n{state.serialized_output}")
-    else:
-        print(f"Workflow ended with status: {state.runtime_status}")
-        if state.failure_details:
-            fd = state.failure_details
-            print("Failure type:", fd.error_type)
-            print("Failure message:", fd.message)
-            print("Stack trace:\n", fd.stack_trace)
+    if not state or state.runtime_status.name == "COMPLETED" or state.failure_details:
+        pass
 
     runtime.shutdown()
     return 0

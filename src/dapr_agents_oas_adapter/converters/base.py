@@ -5,6 +5,7 @@ from typing import Any
 
 from pyagentspec import Component
 
+from dapr_agents_oas_adapter.exceptions import ConversionError, ValidationError
 from dapr_agents_oas_adapter.types import ToolRegistry
 
 
@@ -111,149 +112,6 @@ class ComponentConverter[OASType: Component, DaprType](ABC):
         return metadata
 
 
-class ConversionError(Exception):
-    """Exception raised when a conversion fails.
-
-    Provides detailed error information including:
-    - The component that caused the error
-    - A suggestion for how to fix the error
-    - The underlying cause if available
-    - Component name and type for easier debugging
-    """
-
-    def __init__(
-        self,
-        message: str,
-        component: Any = None,
-        *,
-        suggestion: str | None = None,
-        caused_by: Exception | None = None,
-    ) -> None:
-        """Initialize the error.
-
-        Args:
-            message: Error message describing what went wrong
-            component: The component that failed to convert
-            suggestion: Optional actionable suggestion for fixing the error
-            caused_by: Optional underlying exception that caused this error
-        """
-        self.component = component
-        self.suggestion = suggestion
-        self.caused_by = caused_by
-        self._message = message
-
-        # Build enhanced error message
-        full_message = self._build_message(message)
-        super().__init__(full_message)
-
-    def _build_message(self, message: str) -> str:
-        """Build a detailed error message with context.
-
-        Args:
-            message: The base error message
-
-        Returns:
-            Enhanced message with component info and suggestion
-        """
-        parts = [message]
-
-        # Add component context
-        component_info = self._get_component_info()
-        if component_info:
-            parts.append(f"Component: {component_info}")
-
-        # Add suggestion
-        if self.suggestion:
-            parts.append(f"Suggestion: {self.suggestion}")
-
-        # Add cause info
-        if self.caused_by:
-            parts.append(f"Caused by: {type(self.caused_by).__name__}: {self.caused_by}")
-
-        return " | ".join(parts)
-
-    def _get_component_info(self) -> str:
-        """Extract useful information from the component.
-
-        Returns:
-            String describing the component, or empty string
-        """
-        if self.component is None:
-            return ""
-
-        # Try to get name and type
-        comp_name = None
-        comp_type = None
-
-        if isinstance(self.component, dict):
-            comp_name = self.component.get("name")
-            comp_type = self.component.get("component_type") or self.component.get("type")
-        else:
-            comp_name = getattr(self.component, "name", None)
-            comp_type = getattr(self.component, "component_type", None)
-            if comp_type is None:
-                comp_type = type(self.component).__name__
-
-        parts = []
-        if comp_type:
-            parts.append(f"type={comp_type}")
-        if comp_name:
-            parts.append(f"name={comp_name}")
-
-        return ", ".join(parts) if parts else str(type(self.component).__name__)
-
-    @property
-    def base_message(self) -> str:
-        """Get the original message without enhancements."""
-        return self._message
-
-    def with_suggestion(self, suggestion: str) -> "ConversionError":
-        """Create a new error with an added suggestion.
-
-        Args:
-            suggestion: The suggestion to add
-
-        Returns:
-            New ConversionError with the suggestion
-        """
-        return ConversionError(
-            self._message,
-            self.component,
-            suggestion=suggestion,
-            caused_by=self.caused_by,
-        )
-
-    def with_cause(self, cause: Exception) -> "ConversionError":
-        """Create a new error with an added cause.
-
-        Args:
-            cause: The underlying exception
-
-        Returns:
-            New ConversionError with the cause
-        """
-        return ConversionError(
-            self._message,
-            self.component,
-            suggestion=self.suggestion,
-            caused_by=cause,
-        )
-
-
-class ValidationError(Exception):
-    """Exception raised when validation fails."""
-
-    def __init__(self, message: str, field: str | None = None) -> None:
-        """Initialize the error.
-
-        Args:
-            message: Error message
-            field: The field that failed validation
-        """
-        super().__init__(message)
-        self.field = field
-
-
 class ConverterRegistry:
     """Registry for managing multiple component converters."""
 
@@ -302,7 +160,7 @@ class ConverterRegistry:
                 component,
                 suggestion="Register a converter for this component type",
             )
-        return converter.from_oas(component)  # type: ignore[arg-type]
+        return converter.from_oas(component)
 
     def convert_to_oas(self, component: Any) -> Component:
         """Convert a Dapr component using the appropriate converter.

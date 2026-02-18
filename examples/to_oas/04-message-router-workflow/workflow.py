@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from dapr.ext.workflow import DaprWorkflowContext
 from dapr_agents.llm.dapr import DaprChatClient
 from dapr_agents.workflow.decorators import llm_activity
 from dapr_agents.workflow.decorators.routers import message_router
@@ -23,7 +22,12 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
-from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
+from typing import TYPE_CHECKING
+
+from examples._shared.optional_dotenv import try_load_dotenv
+
+if TYPE_CHECKING:
+    from dapr.ext.workflow import DaprWorkflowContext
 
 try_load_dotenv()
 

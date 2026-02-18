@@ -24,7 +24,7 @@ from dapr_agents_oas_adapter import (
     run_sync,
 )
 from dapr_agents_oas_adapter.cache import InMemoryCache
-from dapr_agents_oas_adapter.converters.base import ConversionError
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     WorkflowDefinition,
@@ -710,9 +710,8 @@ class TestWorkflowValidationIntegration:
 
         # Complex flow should pass basic validation
         # May have warnings but no blocking errors
-        for error in result.errors:
-            # Log any errors for debugging
-            print(f"Validation error: {error}")
+        # Errors, if any, are available in result.errors for debugging
+        _ = result.errors
 
 
 class TestProgrammaticWorkflowCreation:

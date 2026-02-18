@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dapr_agents.llm.dapr import DaprChatClient
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-from dapr_agents_oas_adapter.types import WorkflowDefinition, WorkflowTaskDefinition
+    from dapr_agents.llm.dapr import DaprChatClient
+
+    from dapr_agents_oas_adapter.types import WorkflowDefinition, WorkflowTaskDefinition
 
 
 def _render_prompt(prompt_template: str, values: dict[str, Any]) -> str:

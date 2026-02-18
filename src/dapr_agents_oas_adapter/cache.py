@@ -9,17 +9,20 @@ import hashlib
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dapr_agents_oas_adapter.logging import get_logger
-from dapr_agents_oas_adapter.types import (
-    DaprAgentConfig,
-    ToolRegistry,
-    WorkflowDefinition,
-)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from dapr_agents_oas_adapter.types import (
+        DaprAgentConfig,
+        ToolRegistry,
+        WorkflowDefinition,
+    )
 
 
 @dataclass
@@ -100,22 +103,22 @@ class InMemoryCache[T](CacheBackend[T]):
         self._lock = threading.RLock()
         self._default_ttl = default_ttl
         self._max_size = max_size
-        self._logger = get_logger("InMemoryCache")
+        self._logger = get_logger()
 
     def get(self, key: str) -> T | None:
         """Get a value from the cache."""
         with self._lock:
             entry = self._cache.get(key)
             if entry is None:
-                self._logger.debug("cache_miss", key=key)
+                self._logger.debug("cache_miss", extra={"key": key})
                 return None
 
             if entry.is_expired():
-                self._logger.debug("cache_expired", key=key)
+                self._logger.debug("cache_expired", extra={"key": key})
                 del self._cache[key]
                 return None
 
-            self._logger.debug("cache_hit", key=key)
+            self._logger.debug("cache_hit", extra={"key": key})
             return entry.value
 
     def set(self, key: str, value: T, ttl: float | None = None) -> None:
@@ -137,14 +140,14 @@ class InMemoryCache[T](CacheBackend[T]):
                 self._evict_oldest()
 
             self._cache[key] = CacheEntry(value=value, created_at=now, expires_at=expires_at)
-            self._logger.debug("cache_set", key=key, ttl=actual_ttl)
+            self._logger.debug("cache_set", extra={"key": key, "ttl": actual_ttl})
 
     def delete(self, key: str) -> bool:
         """Delete a value from the cache."""
         with self._lock:
             if key in self._cache:
                 del self._cache[key]
-                self._logger.debug("cache_deleted", key=key)
+                self._logger.debug("cache_deleted", extra={"key": key})
                 return True
             return False
 
@@ -153,7 +156,7 @@ class InMemoryCache[T](CacheBackend[T]):
         with self._lock:
             count = len(self._cache)
             self._cache.clear()
-            self._logger.debug("cache_cleared", entries_removed=count)
+            self._logger.debug("cache_cleared", extra={"entries_removed": count})
 
     def size(self) -> int:
         """Get the number of entries in the cache."""
@@ -167,7 +170,7 @@ class InMemoryCache[T](CacheBackend[T]):
 
         oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].created_at)
         del self._cache[oldest_key]
-        self._logger.debug("cache_evicted", key=oldest_key)
+        self._logger.debug("cache_evicted", extra={"key": oldest_key})
 
     def cleanup_expired(self) -> int:
         """Remove all expired entries.
@@ -180,7 +183,7 @@ class InMemoryCache[T](CacheBackend[T]):
             for key in expired_keys:
                 del self._cache[key]
             if expired_keys:
-                self._logger.debug("cache_cleanup", entries_removed=len(expired_keys))
+                self._logger.debug("cache_cleanup", extra={"entries_removed": len(expired_keys)})
             return len(expired_keys)
 
 
@@ -248,7 +251,7 @@ class CachedLoader:
             cache if cache is not None else InMemoryCache(default_ttl=default_ttl)
         )
         self._default_ttl = default_ttl
-        self._logger = get_logger("CachedLoader")
+        self._logger = get_logger()
         self._stats = CacheStats()
 
     @property
@@ -423,13 +426,13 @@ class CachedLoader:
         cached = self._cache.get(cache_key)
         if cached is not None:
             self._stats.record_hit()
-            self._logger.debug("cache_hit", key=cache_key)
+            self._logger.debug("cache_hit", extra={"key": cache_key})
             return cached
 
         self._stats.record_miss()
         result = loader_fn()
         self._cache.set(cache_key, result, self._default_ttl)
-        self._logger.debug("cache_miss_loaded", key=cache_key)
+        self._logger.debug("cache_miss_loaded", extra={"key": cache_key})
         return result
 
 

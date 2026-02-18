@@ -2,20 +2,16 @@
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pyagentspec import Component, Property  # noqa: F401
 
 # Import flow components from correct submodules
 from pyagentspec.flows.edges import ControlFlowEdge, DataFlowEdge
 from pyagentspec.flows.flow import Flow
-from pyagentspec.flows.node import Node
 from pyagentspec.flows.nodes import EndNode, StartNode
 
-from dapr_agents_oas_adapter.converters.base import (
-    ComponentConverter,
-    ConversionError,
-)
+from dapr_agents_oas_adapter.converters.base import ComponentConverter
 from dapr_agents_oas_adapter.converters.node import NodeConverter
 from dapr_agents_oas_adapter.converters.workflow_helpers import (
     ActivityStubManager,
@@ -24,6 +20,7 @@ from dapr_agents_oas_adapter.converters.workflow_helpers import (
     RetryPolicyBuilder,
     TaskExecutor,
 )
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.logging import get_logger
 from dapr_agents_oas_adapter.types import (
     NamedCallable,
@@ -33,6 +30,9 @@ from dapr_agents_oas_adapter.types import (
     WorkflowTaskDefinition,
 )
 from dapr_agents_oas_adapter.utils import generate_id
+
+if TYPE_CHECKING:
+    from pyagentspec.flows.node import Node
 
 
 class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
@@ -267,10 +267,10 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             data_mappings[key][edge.get("source_output", "")] = edge.get("destination_input", "")
 
         # Merge data mappings into edges
-        for edge in edges:
+        for i, edge in enumerate(edges):
             key = (edge.from_node, edge.to_node)
             if key in data_mappings:
-                edge.data_mapping = data_mappings[key]
+                edges[i] = edge.model_copy(update={"data_mapping": data_mappings[key]})
 
         # Find start node
         start_ref = flow_dict.get("start_node", {})
@@ -396,7 +396,6 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 "Failed to import Dapr workflow SDK",
                 workflow_def,
                 suggestion="Install dapr-ext-workflow: pip install dapr-ext-workflow",
-                caused_by=e,
             ) from e
 
         try:
@@ -529,7 +528,6 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                 "Failed to create Dapr workflow",
                 workflow_def,
                 suggestion="Check workflow definition for invalid task types or edge references",
-                caused_by=e,
             ) from e
 
     def generate_workflow_code(self, workflow_def: WorkflowDefinition) -> str:
@@ -717,11 +715,10 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             try:
                 subflow_def = self.from_dict(component, _visited_flows=visited_flows)
             except Exception as e:
-                logger = get_logger(__name__)
+                logger = get_logger()
                 logger.warning(
                     "Failed to parse subflow",
-                    flow_id=comp_id,
-                    error=str(e),
+                    extra={"flow_id": comp_id, "error": str(e)},
                 )
                 continue
             subflows[comp_id] = subflow_def
