@@ -1566,7 +1566,7 @@ class TestExporterCoveragePatchGaps:
         result = exporter.from_dapr_agent(mock_agent)
         assert result.name == "tool_agent"
         assert len(result.tool_definitions) == 1
-        assert result.tool_definitions[0]["name"] == "search_tool"
+        assert result.tool_definitions[0].name == "search_tool"
 
     def test_from_dapr_agent_failure_raises_conversion_error(self) -> None:
         """Test from_dapr_agent wraps extraction errors in ConversionError."""

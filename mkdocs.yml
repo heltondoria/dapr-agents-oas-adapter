@@ -1,6 +1,6 @@
 site_name: dapr-agents-oas-adapter
 site_description: Bidirectional conversion between Open Agent Spec and Dapr Agents
-site_url: https://github.com/heltondoria/dapr-agents-oas-adapter
+site_url: https://heltondoria.github.io/dapr-agents-oas-adapter/
 repo_url: https://github.com/heltondoria/dapr-agents-oas-adapter
 repo_name: heltondoria/dapr-agents-oas-adapter
 

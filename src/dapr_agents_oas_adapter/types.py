@@ -66,8 +66,8 @@ class OrchestratorType(str, Enum):
     ROUND_ROBIN = "RoundRobinOrchestrator"
 
 
-class LlmClientConfig(BaseModel):
-    """Configuration for Dapr LLM client."""
+class LlmProviderConfig(BaseModel):
+    """LLM provider configuration."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -76,13 +76,18 @@ class LlmClientConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _accept_model_id(cls, data: Any) -> Any:
-        """Accept legacy ``model_id`` key as alias for ``model_name``."""
-        if isinstance(data, dict) and "model_id" in data and "model_name" not in data:
-            data = {**data, "model_name": data.pop("model_id")}
+    def _accept_legacy_aliases(cls, data: Any) -> Any:
+        """Accept ``model_id`` as alias for ``model_name`` and ``url`` for ``base_url``."""
+        if isinstance(data, dict):
+            if "model_id" in data and "model_name" not in data:
+                data = {**data, "model_name": data["model_id"]}
+                del data["model_id"]
+            if "url" in data and "base_url" not in data:
+                data = {**data, "base_url": data["url"]}
+                del data["url"]
         return data
 
-    url: str | None = Field(default=None, description="Provider API URL")
+    base_url: str | None = Field(default=None, description="Custom API endpoint URL")
     api_key: str | None = Field(default=None, description="Provider API key")
     temperature: float = Field(default=0.7, description="Sampling temperature")
     max_tokens: int | None = Field(default=None, description="Maximum tokens to generate")
@@ -183,9 +188,11 @@ class DaprAgentConfig(BaseModel):
     service_port: int = Field(default=8000, description="Service listening port")
     # Additional fields for type safety
     agent_type: str | None = Field(default=None, description="Agent class type name")
-    llm_config: dict[str, Any] | None = Field(default=None, description="LLM client configuration")
-    tool_definitions: list[dict[str, Any]] = Field(
-        default_factory=list, description="Tool definition dictionaries"
+    llm_config: LlmProviderConfig | None = Field(
+        default=None, description="LLM provider configuration"
+    )
+    tool_definitions: list[ToolDefinition] = Field(
+        default_factory=list, description="Tool definitions"
     )
     input_variables: list[str] = Field(default_factory=list, description="Input variable names")
     # DurableAgent-specific configuration fields

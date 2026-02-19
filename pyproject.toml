@@ -1,6 +1,6 @@
 [project]
 name = "dapr-agents-oas-adapter"
-version = "0.7.0"
+version = "0.8.0"
 description = "Adapter library to make Dapr Agents compatible with Open Agent Spec"
 readme = "README.md"
 authors = [
@@ -75,6 +75,9 @@ select = [
     "PL",  # Pylint (PLC/PLE/PLR/PLW)
     "TCH", # flake8-type-checking
     "BLE", # flake8-blind-except
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate (commented-out code)
+    "ASYNC", # flake8-async
 ]
 ignore = [
     "PLR0913",  # too-many-arguments
@@ -118,6 +121,9 @@ exclude = ["**/.venv/**", "**/tests/**", "**/examples/**"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: tests requiring a running Dapr sidecar (deselected by default)",
+]
 
 [tool.coverage.run]
 source = ["src"]
@@ -135,7 +141,7 @@ exclude_lines = [
 ]
 
 [tool.codespell]
-skip = ".git,.venv,.mypy_cache,uv.lock,htmlcov"
+skip = ".git,.venv,.mypy_cache,.hypothesis,uv.lock,htmlcov,site"
 check-filenames = true
 check-hidden = true
 ignore-words-list = "crate,fo,nd,instale"

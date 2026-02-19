@@ -19,7 +19,7 @@ from dapr_agents_oas_adapter.exceptions import (
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
-    LlmClientConfig,
+    LlmProviderConfig,
     ToolDefinition,
     WorkflowDefinition,
     WorkflowEdgeDefinition,
@@ -135,9 +135,9 @@ class TestLlmConfigConverter:
     """Tests for LlmConfigConverter."""
 
     def test_can_convert_llm_client_config(self) -> None:
-        """Test can_convert with LlmClientConfig."""
+        """Test can_convert with LlmProviderConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4")
         assert converter.can_convert(config) is True
 
     def test_can_convert_dict(self) -> None:
@@ -210,7 +210,7 @@ class TestLlmConfigConverter:
         result = converter.from_dict(config_dict)
         assert result.provider == "vllm"
         assert result.model_name == "llama-3"
-        assert result.url == "http://localhost:8000"
+        assert result.base_url == "http://localhost:8000"
 
     def test_from_dict_ollama(self) -> None:
         """Test from_dict with OllamaConfig."""
@@ -240,10 +240,10 @@ class TestLlmConfigConverter:
     def test_to_dict(self) -> None:
         """Test to_dict conversion."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama-3",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
             temperature=0.8,
         )
         result = converter.to_dict(config)
@@ -254,7 +254,7 @@ class TestLlmConfigConverter:
     def test_to_dict_openai(self) -> None:
         """Test to_dict for OpenAI provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             api_key="sk-test",
@@ -266,10 +266,10 @@ class TestLlmConfigConverter:
     def test_to_dict_ollama(self) -> None:
         """Test to_dict for Ollama provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="ollama",
             model_name="llama2",
-            url="http://localhost:11434",
+            base_url="http://localhost:11434",
         )
         result = converter.to_dict(config)
         assert result["component_type"] == "OllamaConfig"
@@ -277,7 +277,7 @@ class TestLlmConfigConverter:
     def test_to_dict_with_generation_params(self) -> None:
         """Test to_dict includes generation parameters."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.5,
@@ -293,7 +293,7 @@ class TestLlmConfigConverter:
     def test_to_dict_no_generation_params(self) -> None:
         """Test to_dict without generation parameters."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.7,  # Default, not included
@@ -316,7 +316,7 @@ class TestLlmConfigConverter:
         result = converter.from_oas(mock_config)
         assert result.provider == "vllm"
         assert result.model_name == "llama-3"
-        assert result.url == "http://localhost:8000"
+        assert result.base_url == "http://localhost:8000"
 
     def test_from_oas_openai_config(self) -> None:
         """Test from_oas with OpenAIConfig."""
@@ -400,10 +400,10 @@ class TestLlmConfigConverter:
     def test_to_oas_vllm(self) -> None:
         """Test to_oas creates VllmConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama-3",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
         )
 
         result = converter.to_oas(config)
@@ -416,7 +416,7 @@ class TestLlmConfigConverter:
     def test_to_oas_openai(self) -> None:
         """Test to_oas creates OpenAiConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
         )
@@ -430,10 +430,10 @@ class TestLlmConfigConverter:
     def test_to_oas_ollama(self) -> None:
         """Test to_oas creates OllamaConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="ollama",
             model_name="llama2",
-            url="http://localhost:11434",
+            base_url="http://localhost:11434",
         )
 
         result = converter.to_oas(config)
@@ -446,7 +446,7 @@ class TestLlmConfigConverter:
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="unsupported",
             model_name="model",
         )
@@ -481,7 +481,7 @@ class TestLlmConfigConverter:
     def test_to_oas_with_custom_temperature_and_max_tokens(self) -> None:
         """Test to_oas passes non-default temperature and max_tokens to OAS config."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.9,
@@ -1138,13 +1138,8 @@ class TestAgentConverter:
             name="tools_agent",
             role="Helper",
             tools=["search"],
-        )
-        # Add tool definitions as extra attribute
-        object.__setattr__(
-            config,
-            "tool_definitions",
-            [
-                {"name": "search", "description": "Search tool"},
+            tool_definitions=[
+                ToolDefinition(name="search", description="Search tool"),
             ],
         )
 
@@ -1249,8 +1244,9 @@ class TestAgentConverter:
         mock_agent.llm_config = mock_llm
 
         result = converter.from_oas(mock_agent)
-        llm_config = getattr(result, "llm_config", {})
-        assert isinstance(llm_config, dict)
+        assert isinstance(result.llm_config, LlmProviderConfig)
+        assert result.llm_config.provider == "openai"
+        assert result.llm_config.model_name == "gpt-4"
 
     def test_from_oas_with_metadata(self) -> None:
         """Test from_oas extracts metadata."""
@@ -1296,15 +1292,7 @@ class TestAgentConverter:
         config = DaprAgentConfig(
             name="llm_agent",
             tools=[],
-        )
-        # Add llm_config as extra attribute
-        object.__setattr__(
-            config,
-            "llm_config",
-            {
-                "component_type": "OpenAIConfig",
-                "model_id": "gpt-4",
-            },
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
         )
 
         result = converter.to_oas(config)
@@ -1316,12 +1304,8 @@ class TestAgentConverter:
         config = DaprAgentConfig(
             name="tools_agent",
             tools=["search"],
-        )
-        object.__setattr__(
-            config,
-            "tool_definitions",
-            [
-                {"name": "search", "description": "Search"},
+            tool_definitions=[
+                ToolDefinition(name="search", description="Search"),
             ],
         )
 
@@ -1483,8 +1467,8 @@ class TestAgentConverter:
         result = converter._extract_tools(mock_agent)
         assert len(result) == 2
 
-    def test_extract_llm_config(self) -> None:
-        """Test _extract_llm_config extracts config."""
+    def test_extract_llm_config_typed(self) -> None:
+        """Test _extract_llm_config_typed extracts typed config."""
         converter = AgentConverter()
 
         mock_llm = MagicMock()
@@ -1497,19 +1481,19 @@ class TestAgentConverter:
         mock_agent = MagicMock()
         mock_agent.llm_config = mock_llm
 
-        result = converter._extract_llm_config(mock_agent)
-        assert isinstance(result, dict)
-        assert result.get("model_id") == "gpt-4"
+        result = converter._extract_llm_config_typed(mock_agent)
+        assert isinstance(result, LlmProviderConfig)
+        assert result.model_name == "gpt-4"
 
-    def test_extract_llm_config_none(self) -> None:
-        """Test _extract_llm_config returns empty dict when no config."""
+    def test_extract_llm_config_typed_none(self) -> None:
+        """Test _extract_llm_config_typed returns None when no config."""
         converter = AgentConverter()
 
         mock_agent = MagicMock()
         mock_agent.llm_config = None
 
-        result = converter._extract_llm_config(mock_agent)
-        assert result == {}
+        result = converter._extract_llm_config_typed(mock_agent)
+        assert result is None
 
     def test_extract_role_and_goal_from_description(self) -> None:
         """Test _extract_role_and_goal uses description."""
@@ -1790,7 +1774,7 @@ class TestAgentConverter:
             role="Tester",
             goal="Test things",
             agent_type="DurableAgent",
-            llm_config={"provider": "openai", "model_id": "gpt-4"},
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
             agent_topic="test.requests",
             memory_store_name="testmemory",
             memory_session_id="test-session",
@@ -1828,7 +1812,7 @@ class TestAgentConverter:
             role="Tester",
             goal="Test registry path",
             agent_type="DurableAgent",
-            llm_config={"provider": "openai", "model_id": "gpt-4"},
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
             agent_topic="test.requests",
             memory_store_name="testmemory",
             memory_session_id="test-session",
@@ -1871,7 +1855,9 @@ class TestAgentConverter:
             {"dapr_agents": mock_dapr_agents},
         ):
             try:
-                result = converter._create_llm_client({"provider": "openai", "model_id": "gpt-4"})
+                result = converter._create_llm_client(
+                    LlmProviderConfig(provider="openai", model_name="gpt-4")
+                )
                 assert result is not None
             except (ImportError, ConversionError):
                 pass
@@ -1886,7 +1872,7 @@ class TestAgentConverter:
         with patch.dict("sys.modules", {"dapr_agents": mock_module}):
             try:
                 result = converter._create_llm_client(
-                    {"provider": "openai", "model_name": "gpt-4o"}
+                    LlmProviderConfig(provider="openai", model_name="gpt-4o")
                 )
                 assert result is not None
                 # Verify it used model_name value, not fallback "gpt-4"
@@ -2133,7 +2119,9 @@ class TestAgentConverter:
     def test_create_llm_client_ollama_provider(self) -> None:
         """Test _create_llm_client with Ollama provider."""
         converter = AgentConverter()
-        llm_config = {"provider": "ollama", "model_id": "llama2", "url": "http://custom:11434"}
+        llm_config = LlmProviderConfig(
+            provider="ollama", model_name="llama2", base_url="http://custom:11434"
+        )
 
         with patch.dict(
             "sys.modules",
@@ -2151,7 +2139,9 @@ class TestAgentConverter:
     def test_create_llm_client_vllm_provider(self) -> None:
         """Test _create_llm_client with vLLM provider."""
         converter = AgentConverter()
-        llm_config = {"provider": "vllm", "model_id": "mistral", "url": "http://vllm:8000"}
+        llm_config = LlmProviderConfig(
+            provider="vllm", model_name="mistral", base_url="http://vllm:8000"
+        )
 
         with patch.dict(
             "sys.modules",
@@ -2169,7 +2159,7 @@ class TestAgentConverter:
     def test_create_llm_client_unknown_provider(self) -> None:
         """Test _create_llm_client with unknown provider defaults to OpenAI."""
         converter = AgentConverter()
-        llm_config = {"provider": "unknown_provider", "model_id": "custom-model"}
+        llm_config = LlmProviderConfig(provider="unknown_provider", model_name="custom-model")
 
         with patch.dict(
             "sys.modules",
@@ -2187,7 +2177,7 @@ class TestAgentConverter:
     def test_create_llm_client_import_error(self) -> None:
         """Test _create_llm_client raises ConversionError on ImportError."""
         converter = AgentConverter()
-        llm_config = {"provider": "openai", "model_id": "gpt-4"}
+        llm_config = LlmProviderConfig(provider="openai", model_name="gpt-4")
 
         # Remove dapr_agents from modules to trigger ImportError
         with patch.dict("sys.modules", {"dapr_agents": None}):
@@ -3790,6 +3780,39 @@ class TestFlowConverter:
         result = converter._convert_edges(mock_flow)
         assert len(result) == 0
 
+    def test_convert_edges_merges_data_edge_into_existing_control_edge(self) -> None:
+        """Test _convert_edges merges data flow into matching control flow edge."""
+        converter = FlowConverter()
+
+        mock_flow = MagicMock()
+
+        mock_from = MagicMock()
+        mock_from.name = "nodeA"
+        mock_to = MagicMock()
+        mock_to.name = "nodeB"
+
+        # Control flow edge
+        mock_control_edge = MagicMock()
+        mock_control_edge.from_node = mock_from
+        mock_control_edge.to_node = mock_to
+        mock_control_edge.from_branch = None
+
+        # Data flow edge on same pair (uses source_node/destination_node)
+        mock_data_edge = MagicMock()
+        mock_data_edge.source_node = mock_from
+        mock_data_edge.destination_node = mock_to
+        mock_data_edge.source_output = "result"
+        mock_data_edge.destination_input = "input_text"
+
+        mock_flow.control_flow_connections = [mock_control_edge]
+        mock_flow.data_flow_connections = [mock_data_edge]
+
+        result = converter._convert_edges(mock_flow)
+        assert len(result) == 1
+        assert result[0].from_node == "nodeA"
+        assert result[0].to_node == "nodeB"
+        assert result[0].data_mapping == {"result": "input_text"}
+
 
 class TestConverterRegistry:
     """Tests for ConverterRegistry."""
@@ -3803,7 +3826,7 @@ class TestConverterRegistry:
         registry.register(llm_converter)
         registry.register(tool_converter)
 
-        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4")
         found = registry.get_converter(config)
         assert found is llm_converter
 
@@ -3830,7 +3853,7 @@ class TestConverterRegistry:
         )
 
         result = registry.convert_from_oas(config)
-        assert isinstance(result, LlmClientConfig)
+        assert isinstance(result, LlmProviderConfig)
         assert result.model_name == "llama"
 
     def test_convert_from_oas_no_converter(self) -> None:
@@ -3847,10 +3870,10 @@ class TestConverterRegistry:
         llm_converter = LlmConfigConverter()
         registry.register(llm_converter)
 
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
         )
 
         result = registry.convert_to_oas(config)
@@ -3940,6 +3963,36 @@ class TestFlowConverterEdgeCases:
         assert "multi_task_workflow" in code
         assert "task1" in code
         assert "task2" in code
+
+    def test_from_dict_circular_reference_returns_stub(self) -> None:
+        """Test from_dict returns a stub WorkflowDefinition on circular reference.
+
+        When a flow references itself (or is encountered again via subflows),
+        the ``_visited_flows`` guard should short-circuit and return a minimal
+        WorkflowDefinition with just name/flow_id — no infinite recursion.
+        """
+        converter = FlowConverter()
+        flow_dict: dict[str, Any] = {
+            "component_type": "Flow",
+            "id": "flow_circular",
+            "name": "circular_flow",
+            "nodes": [],
+            "edges": [],
+        }
+
+        # First call — normal conversion (flow_circular gets added to visited set)
+        visited: set[str] = set()
+        result1 = converter.from_dict(flow_dict, _visited_flows=visited)
+        assert result1.name == "circular_flow"
+        assert "flow_circular" in visited
+
+        # Second call with same visited set — should short-circuit
+        result2 = converter.from_dict(flow_dict, _visited_flows=visited)
+        assert result2.name == "circular_flow"
+        assert result2.flow_id == "flow_circular"
+        # Stub should have no tasks or edges
+        assert result2.tasks == []
+        assert result2.edges == []
 
 
 class TestNodeConverterEdgeCases:

@@ -13,6 +13,7 @@ from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
+    LlmProviderConfig,
     ToolDefinition,
     ToolRegistry,
 )
@@ -88,8 +89,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             agents_registry_store_name=metadata.get("agents_registry_store_name", "agentsregistry"),
             service_port=metadata.get("service_port", 8000),
             agent_type=agent_type.value,
-            llm_config=self._extract_llm_config(component),
-            tool_definitions=[self._tool_converter.to_dict(t) for t in tools],
+            llm_config=self._extract_llm_config_typed(component),
+            tool_definitions=tools,
             input_variables=template_vars,
             # DurableAgent-specific fields from metadata
             agent_topic=metadata.get("agent_topic"),
@@ -114,10 +115,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         agent_id = generate_id("agent")
 
         # Build LLM config
-        llm_config_dict = component.llm_config
-        if llm_config_dict:
-            llm_config = self._llm_converter.from_dict(llm_config_dict)
-            oas_llm = self._llm_converter.to_oas(llm_config)
+        if component.llm_config:
+            oas_llm = self._llm_converter.to_oas(component.llm_config)
         else:
             # Create default LLM config
             oas_llm = VllmConfig(
@@ -128,10 +127,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             )
 
         # Build tools
-        tool_defs = component.tool_definitions or []
         oas_tools = []
-        for tool_dict in tool_defs:
-            tool_def = self._tool_converter.from_dict(tool_dict)
+        for tool_def in component.tool_definitions:
             oas_tools.append(self._tool_converter.to_oas(tool_def))
 
         # Build system prompt
@@ -207,27 +204,19 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             DaprAgentConfig with the converted settings
         """
         # Extract LLM config
-        llm_config = agent_dict.get("llm_config", {})
+        llm_config_dict = agent_dict.get("llm_config")
+        llm_config = self._llm_converter.from_dict(llm_config_dict) if llm_config_dict else None
 
         # Extract tools and convert to proper format
         tools = agent_dict.get("tools", [])
         tool_names = [t.get("name", "") if isinstance(t, dict) else str(t) for t in tools]
-        # Ensure tool_definitions are properly formatted dictionaries
-        tool_definitions = []
+        # Build typed ToolDefinition objects
+        tool_definitions: list[ToolDefinition] = []
         for t in tools:
             if isinstance(t, dict):
-                tool_definitions.append(
-                    self._tool_converter.to_dict(self._tool_converter.from_dict(t))
-                )
+                tool_definitions.append(self._tool_converter.from_dict(t))
             else:
-                tool_definitions.append(
-                    {
-                        "name": str(t),
-                        "description": "",
-                        "inputs": [],
-                        "outputs": [],
-                    }
-                )
+                tool_definitions.append(ToolDefinition(name=str(t), description=""))
 
         # Extract system prompt
         system_prompt = agent_dict.get("system_prompt", "")
@@ -285,8 +274,10 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         Returns:
             Dictionary representation of the agent
         """
-        llm_config = config.llm_config or {}
-        tool_defs = config.tool_definitions or []
+        llm_config_dict = (
+            self._llm_converter.to_dict(config.llm_config) if config.llm_config else {}
+        )
+        tool_defs = [self._tool_converter.to_dict(t) for t in config.tool_definitions]
 
         # Build metadata with DurableAgent-specific fields if present
         # Use `is not None` to preserve empty strings (not truthy checks)
@@ -323,7 +314,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             "role": config.role,
             "goal": config.goal,
             "description": config.goal,
-            "llm_config": llm_config,
+            "llm_config": llm_config_dict,
             "system_prompt": config.system_prompt or self._build_system_prompt(config),
             "tools": tool_defs,
             "inputs": self._build_inputs(config),
@@ -504,11 +495,11 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 suggestion="Check agent configuration and ensure all required fields are set",
             ) from e
 
-    def _create_llm_client(self, llm_config: dict[str, Any] | None) -> Any:
+    def _create_llm_client(self, llm_config: LlmProviderConfig | None) -> Any:
         """Create a Dapr LLM client from configuration.
 
         Args:
-            llm_config: Dictionary with LLM configuration
+            llm_config: Typed LLM client configuration
 
         Returns:
             A Dapr LLM client instance
@@ -517,12 +508,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             ConversionError: If client creation fails
         """
         try:
-            provider = llm_config.get("provider", "openai") if llm_config else "openai"
-            model_name = (
-                llm_config.get("model_name") or llm_config.get("model_id", "gpt-4")
-                if llm_config
-                else "gpt-4"
-            )
+            provider = llm_config.provider if llm_config else "openai"
+            model_name = llm_config.model_name if llm_config else "gpt-4"
 
             if provider == "openai":
                 from dapr_agents import OpenAIChatClient
@@ -533,16 +520,12 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 # Treat Ollama as an OpenAI-compatible endpoint.
                 from dapr_agents import OpenAIChatClient
 
-                url = (
-                    llm_config.get("url", "http://localhost:11434")
-                    if llm_config
-                    else "http://localhost:11434"
-                )
-                return OpenAIChatClient(model=model_name, base_url=url)
+                url = llm_config.base_url if llm_config else "http://localhost:11434"
+                return OpenAIChatClient(model=model_name, base_url=url or "http://localhost:11434")
             if provider == "vllm":
                 from dapr_agents import OpenAIChatClient
 
-                url = llm_config.get("url") if llm_config else None
+                url = llm_config.base_url if llm_config else None
                 return OpenAIChatClient(model=model_name, base_url=url)
             # Default to OpenAI-compatible client
             from dapr_agents import OpenAIChatClient
@@ -601,13 +584,12 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
 
         return tools
 
-    def _extract_llm_config(self, component: OASAgent) -> dict[str, Any]:
-        """Extract LLM configuration from an OAS Agent."""
+    def _extract_llm_config_typed(self, component: OASAgent) -> LlmProviderConfig | None:
+        """Extract typed LLM configuration from an OAS Agent."""
         llm_config = getattr(component, "llm_config", None)
         if llm_config:
-            dapr_config = self._llm_converter.from_oas(llm_config)
-            return self._llm_converter.to_dict(dapr_config)
-        return {}
+            return self._llm_converter.from_oas(llm_config)
+        return None
 
     def _extract_role_and_goal(self, component: OASAgent) -> tuple[str, str]:
         """Extract role and goal from an OAS Agent."""

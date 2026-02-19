@@ -78,17 +78,17 @@ dmypy.json
 .cursor
 secrets.json
 **/components/secrets.json
-.ralph/logs
-.ralph/status.json
-.ralph/.call_count
-.ralph/progress.json
-.ralph/.circuit_breaker_history
+
+# Ralph AI agent runtime artifacts
+.ralph/
+
+# Prevent re-creation of deleted files
+prd_creator_assistant.md
+
+# Dapr local config (lives in examples/_shared/dapr/)
+/dapr/
+
 /site/
-/.ralph/.circuit_breaker_state
-/.ralph/.exit_signals
-/.ralph/.last_reset
-/.ralph/.ralph_session
-/.ralph/.ralph_session_history
 
 # Dapr runtime logs
 **/.dapr/logs/

@@ -3,7 +3,7 @@
 **Bidirectional conversion between Open Agent Spec (OAS) and Dapr Agents.**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/heltondoria/dapr-agents-oas-adapter/blob/main/LICENSE)
 
 ## Overview
 

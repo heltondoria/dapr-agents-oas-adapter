@@ -443,6 +443,30 @@ class TestConvenienceFunctions:
         with pytest.raises(WorkflowValidationError):
             validate_workflow_dict(workflow_dict, raise_on_error=True)
 
+    def test_validate_workflow_dict_chains_cause(self) -> None:
+        """Test that raise_if_invalid chains the original parse exception."""
+        workflow_dict = {"invalid": "structure"}
+        with pytest.raises(WorkflowValidationError) as exc_info:
+            validate_workflow_dict(workflow_dict, raise_on_error=True)
+        assert exc_info.value.__cause__ is not None
+
+    def test_raise_if_invalid_chains_cause_from_add_error(self) -> None:
+        """Test that raise_if_invalid sets __cause__ from first error's cause."""
+        original = ValueError("original error")
+        result = ValidationResult()
+        result.add_error("wrapper message", cause=original)
+        with pytest.raises(WorkflowValidationError) as exc_info:
+            result.raise_if_invalid()
+        assert exc_info.value.__cause__ is original
+
+    def test_raise_if_invalid_no_cause_when_absent(self) -> None:
+        """Test that __cause__ is None when no cause is provided."""
+        result = ValidationResult()
+        result.add_error("error without cause")
+        with pytest.raises(WorkflowValidationError) as exc_info:
+            result.raise_if_invalid()
+        assert exc_info.value.__cause__ is None
+
 
 class TestWorkflowValidationError:
     """Tests for WorkflowValidationError exception."""

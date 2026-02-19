@@ -17,6 +17,7 @@ from pyagentspec.flows.nodes import (
 )
 
 from dapr_agents_oas_adapter.converters.base import ComponentConverter
+from dapr_agents_oas_adapter.logging import get_logger
 from dapr_agents_oas_adapter.types import (
     ToolRegistry,
     WorkflowTaskDefinition,
@@ -434,7 +435,11 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
 
             json_str = serializer.to_json(component)
             return json.loads(json_str)
-        except Exception:
+        except (ImportError, TypeError, ValueError, AttributeError) as exc:
+            get_logger().debug(
+                "pyagentspec serializer fallback",
+                extra={"component_type": type(component).__name__, "error": str(exc)},
+            )
             # Fallback 1: try model_dump() for Pydantic models
             model_dump = getattr(component, "model_dump", None)
             if callable(model_dump):
