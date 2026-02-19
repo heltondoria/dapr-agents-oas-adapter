@@ -30,7 +30,7 @@ def _dapr_sidecar_available(retries: int = 3, interval: float = 2.0) -> bool:
     for _ in range(retries):
         try:
             resp = httpx.get(f"http://localhost:{port}/v1.0/healthz", timeout=2.0)
-            if resp.status_code == 204:
+            if resp.is_success:
                 return True
         except httpx.HTTPError:
             pass
