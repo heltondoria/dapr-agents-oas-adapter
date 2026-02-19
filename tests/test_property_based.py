@@ -13,7 +13,7 @@ from dapr_agents_oas_adapter.converters.flow import FlowConverter
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
-    LlmClientConfig,
+    LlmProviderConfig,
     PropertySchema,
     ToolDefinition,
     WorkflowDefinition,
@@ -61,14 +61,14 @@ def retry_policy_dicts(draw: st.DrawFn) -> dict[str, Any]:
 
 
 @st.composite
-def llm_client_configs(draw: st.DrawFn) -> LlmClientConfig:
-    """Generate valid LlmClientConfig instances."""
-    return LlmClientConfig(
+def llm_client_configs(draw: st.DrawFn) -> LlmProviderConfig:
+    """Generate valid LlmProviderConfig instances."""
+    return LlmProviderConfig(
         provider=draw(st.sampled_from(["openai", "ollama", "vllm", "oci"])),
         model_name=draw(
             st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz0123456789-_.")
         ),
-        url=draw(st.none() | st.just("http://localhost:8000")),
+        base_url=draw(st.none() | st.just("http://localhost:8000")),
         api_key=draw(st.none() | st.text(min_size=1, max_size=50)),
         temperature=draw(st.floats(min_value=0.0, max_value=2.0)),
         max_tokens=draw(st.none() | st.integers(min_value=1, max_value=4096)),
@@ -218,23 +218,23 @@ class TestPropertySchemaProperties:
         assert title[0].isalpha() or title[0] == "_"
 
 
-class TestLlmClientConfigProperties:
-    """Property-based tests for LlmClientConfig."""
+class TestLlmProviderConfigProperties:
+    """Property-based tests for LlmProviderConfig."""
 
     @given(llm_client_configs())
     @settings(max_examples=50)
-    def test_config_is_valid(self, config: LlmClientConfig) -> None:
-        """LlmClientConfig instances are always valid."""
+    def test_config_is_valid(self, config: LlmProviderConfig) -> None:
+        """LlmProviderConfig instances are always valid."""
         assert config.provider in ["openai", "ollama", "vllm", "oci"]
         assert len(config.model_name) > 0
         assert 0.0 <= config.temperature <= 2.0
 
     @given(llm_client_configs())
     @settings(max_examples=50)
-    def test_config_roundtrip(self, config: LlmClientConfig) -> None:
-        """LlmClientConfig can be serialized and deserialized."""
+    def test_config_roundtrip(self, config: LlmProviderConfig) -> None:
+        """LlmProviderConfig can be serialized and deserialized."""
         data = config.model_dump()
-        restored = LlmClientConfig.model_validate(data)
+        restored = LlmProviderConfig.model_validate(data)
         assert restored.provider == config.provider
         assert restored.model_name == config.model_name
         assert restored.temperature == config.temperature

@@ -12,7 +12,7 @@ from dapr_agents_oas_adapter.types import (
     PYTHON_TO_JSON_SCHEMA,
     DaprAgentConfig,
     DaprAgentType,
-    LlmClientConfig,
+    LlmProviderConfig,
     OASComponentType,
     OrchestratorType,
     ToolDefinition,
@@ -45,18 +45,18 @@ class TestEnums:
         assert OrchestratorType.ROUND_ROBIN.value == "RoundRobinOrchestrator"
 
 
-class TestLlmClientConfig:
-    """Tests for LlmClientConfig dataclass."""
+class TestLlmProviderConfig:
+    """Tests for LlmProviderConfig dataclass."""
 
     def test_default_values(self) -> None:
         """Test default values for LLM client config."""
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
         )
         assert config.provider == "openai"
         assert config.model_name == "gpt-4"
-        assert config.url is None
+        assert config.base_url is None
         assert config.api_key is None
         assert config.temperature == 0.7
         assert config.max_tokens is None
@@ -64,10 +64,10 @@ class TestLlmClientConfig:
 
     def test_all_values(self) -> None:
         """Test LLM client config with all values."""
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama-3",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
             api_key="secret",
             temperature=0.5,
             max_tokens=1000,
@@ -75,7 +75,7 @@ class TestLlmClientConfig:
         )
         assert config.provider == "vllm"
         assert config.model_name == "llama-3"
-        assert config.url == "http://localhost:8000"
+        assert config.base_url == "http://localhost:8000"
         assert config.api_key == "secret"
         assert config.temperature == 0.5
         assert config.max_tokens == 1000
@@ -232,8 +232,8 @@ class TestPydanticFeatures:
     """Tests for Pydantic-specific features (RF-002 acceptance criteria)."""
 
     def test_llm_client_config_model_json_schema(self) -> None:
-        """Verify LlmClientConfig generates valid JSON schema."""
-        schema = LlmClientConfig.model_json_schema()
+        """Verify LlmProviderConfig generates valid JSON schema."""
+        schema = LlmProviderConfig.model_json_schema()
         assert schema["type"] == "object"
         assert "provider" in schema["properties"]
         assert "model_name" in schema["properties"]
@@ -241,9 +241,9 @@ class TestPydanticFeatures:
         assert "model_name" in schema["required"]
 
     def test_llm_client_config_rejects_extra_fields(self) -> None:
-        """Verify LlmClientConfig rejects unknown fields."""
+        """Verify LlmProviderConfig rejects unknown fields."""
         with pytest.raises(ValidationError) as exc_info:
-            LlmClientConfig(
+            LlmProviderConfig(
                 provider="openai",
                 model_name="gpt-4",
                 unknown_field="should_fail",  # type: ignore[call-arg]
@@ -251,9 +251,9 @@ class TestPydanticFeatures:
         assert "extra" in str(exc_info.value).lower()
 
     def test_llm_client_config_requires_mandatory_fields(self) -> None:
-        """Verify LlmClientConfig enforces required fields."""
+        """Verify LlmProviderConfig enforces required fields."""
         with pytest.raises(ValidationError) as exc_info:
-            LlmClientConfig()  # type: ignore[call-arg]
+            LlmProviderConfig()  # type: ignore[call-arg]
         errors = exc_info.value.errors()
         field_names = [e["loc"][0] for e in errors]
         assert "provider" in field_names
@@ -378,7 +378,7 @@ class TestPydanticFeatures:
 
     def test_model_json_roundtrip(self) -> None:
         """Verify models can be serialized to JSON and back."""
-        original = LlmClientConfig(
+        original = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.5,
@@ -387,7 +387,7 @@ class TestPydanticFeatures:
         # Serialize to JSON
         json_str = original.model_dump_json()
         # Deserialize back
-        restored = LlmClientConfig.model_validate_json(json_str)
+        restored = LlmProviderConfig.model_validate_json(json_str)
 
         assert restored.provider == original.provider
         assert restored.model_name == original.model_name
@@ -399,8 +399,8 @@ class TestFrozenModels:
     """Tests for frozen model immutability."""
 
     def test_llm_client_config_frozen_raises_validation_error(self) -> None:
-        """Verify assigning to a field on a frozen LlmClientConfig raises ValidationError."""
-        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        """Verify assigning to a field on a frozen LlmProviderConfig raises ValidationError."""
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4")
         with pytest.raises(ValidationError):
             config.provider = "ollama"
 

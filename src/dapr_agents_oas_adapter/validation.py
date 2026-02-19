@@ -32,6 +32,7 @@ class ValidationIssue:
     severity: ValidationSeverity = ValidationSeverity.ERROR
     field: str | None = None
     suggestion: str | None = None
+    cause: Exception | None = None
 
     def __str__(self) -> str:
         """Format the issue as a string."""
@@ -70,6 +71,7 @@ class ValidationResult:
         message: str,
         field: str | None = None,
         suggestion: str | None = None,
+        cause: Exception | None = None,
     ) -> None:
         """Add an error-level issue."""
         self.issues.append(
@@ -78,6 +80,7 @@ class ValidationResult:
                 severity=ValidationSeverity.ERROR,
                 field=field,
                 suggestion=suggestion,
+                cause=cause,
             )
         )
 
@@ -102,9 +105,14 @@ class ValidationResult:
         self.issues.extend(other.issues)
 
     def raise_if_invalid(self) -> None:
-        """Raise WorkflowValidationError if there are any errors."""
+        """Raise WorkflowValidationError if there are any errors.
+
+        If the first error has a ``cause``, it is chained via ``raise ... from``.
+        """
         if not self.is_valid:
-            raise WorkflowValidationError(self.errors)
+            error = WorkflowValidationError(self.errors)
+            first_cause = self.errors[0].cause if self.errors else None
+            raise error from first_cause
 
 
 class WorkflowValidationError(_BaseValidationError):
@@ -476,7 +484,9 @@ def validate_workflow_dict(
     except Exception as e:
         result = ValidationResult()
         result.add_error(
-            f"Failed to parse workflow: {e}", suggestion="Check the workflow structure"
+            f"Failed to parse workflow: {e}",
+            suggestion="Check the workflow structure",
+            cause=e,
         )
         if raise_on_error:
             result.raise_if_invalid()

@@ -19,7 +19,7 @@ from dapr_agents_oas_adapter.exceptions import (
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
-    LlmClientConfig,
+    LlmProviderConfig,
     ToolDefinition,
     WorkflowDefinition,
     WorkflowEdgeDefinition,
@@ -135,9 +135,9 @@ class TestLlmConfigConverter:
     """Tests for LlmConfigConverter."""
 
     def test_can_convert_llm_client_config(self) -> None:
-        """Test can_convert with LlmClientConfig."""
+        """Test can_convert with LlmProviderConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4")
         assert converter.can_convert(config) is True
 
     def test_can_convert_dict(self) -> None:
@@ -210,7 +210,7 @@ class TestLlmConfigConverter:
         result = converter.from_dict(config_dict)
         assert result.provider == "vllm"
         assert result.model_name == "llama-3"
-        assert result.url == "http://localhost:8000"
+        assert result.base_url == "http://localhost:8000"
 
     def test_from_dict_ollama(self) -> None:
         """Test from_dict with OllamaConfig."""
@@ -240,10 +240,10 @@ class TestLlmConfigConverter:
     def test_to_dict(self) -> None:
         """Test to_dict conversion."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama-3",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
             temperature=0.8,
         )
         result = converter.to_dict(config)
@@ -254,7 +254,7 @@ class TestLlmConfigConverter:
     def test_to_dict_openai(self) -> None:
         """Test to_dict for OpenAI provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             api_key="sk-test",
@@ -266,10 +266,10 @@ class TestLlmConfigConverter:
     def test_to_dict_ollama(self) -> None:
         """Test to_dict for Ollama provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="ollama",
             model_name="llama2",
-            url="http://localhost:11434",
+            base_url="http://localhost:11434",
         )
         result = converter.to_dict(config)
         assert result["component_type"] == "OllamaConfig"
@@ -277,7 +277,7 @@ class TestLlmConfigConverter:
     def test_to_dict_with_generation_params(self) -> None:
         """Test to_dict includes generation parameters."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.5,
@@ -293,7 +293,7 @@ class TestLlmConfigConverter:
     def test_to_dict_no_generation_params(self) -> None:
         """Test to_dict without generation parameters."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.7,  # Default, not included
@@ -316,7 +316,7 @@ class TestLlmConfigConverter:
         result = converter.from_oas(mock_config)
         assert result.provider == "vllm"
         assert result.model_name == "llama-3"
-        assert result.url == "http://localhost:8000"
+        assert result.base_url == "http://localhost:8000"
 
     def test_from_oas_openai_config(self) -> None:
         """Test from_oas with OpenAIConfig."""
@@ -400,10 +400,10 @@ class TestLlmConfigConverter:
     def test_to_oas_vllm(self) -> None:
         """Test to_oas creates VllmConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama-3",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
         )
 
         result = converter.to_oas(config)
@@ -416,7 +416,7 @@ class TestLlmConfigConverter:
     def test_to_oas_openai(self) -> None:
         """Test to_oas creates OpenAiConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
         )
@@ -430,10 +430,10 @@ class TestLlmConfigConverter:
     def test_to_oas_ollama(self) -> None:
         """Test to_oas creates OllamaConfig."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="ollama",
             model_name="llama2",
-            url="http://localhost:11434",
+            base_url="http://localhost:11434",
         )
 
         result = converter.to_oas(config)
@@ -446,7 +446,7 @@ class TestLlmConfigConverter:
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="unsupported",
             model_name="model",
         )
@@ -481,7 +481,7 @@ class TestLlmConfigConverter:
     def test_to_oas_with_custom_temperature_and_max_tokens(self) -> None:
         """Test to_oas passes non-default temperature and max_tokens to OAS config."""
         converter = LlmConfigConverter()
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="openai",
             model_name="gpt-4",
             temperature=0.9,
@@ -1244,7 +1244,7 @@ class TestAgentConverter:
         mock_agent.llm_config = mock_llm
 
         result = converter.from_oas(mock_agent)
-        assert isinstance(result.llm_config, LlmClientConfig)
+        assert isinstance(result.llm_config, LlmProviderConfig)
         assert result.llm_config.provider == "openai"
         assert result.llm_config.model_name == "gpt-4"
 
@@ -1292,7 +1292,7 @@ class TestAgentConverter:
         config = DaprAgentConfig(
             name="llm_agent",
             tools=[],
-            llm_config=LlmClientConfig(provider="openai", model_name="gpt-4"),
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
         )
 
         result = converter.to_oas(config)
@@ -1482,7 +1482,7 @@ class TestAgentConverter:
         mock_agent.llm_config = mock_llm
 
         result = converter._extract_llm_config_typed(mock_agent)
-        assert isinstance(result, LlmClientConfig)
+        assert isinstance(result, LlmProviderConfig)
         assert result.model_name == "gpt-4"
 
     def test_extract_llm_config_typed_none(self) -> None:
@@ -1774,7 +1774,7 @@ class TestAgentConverter:
             role="Tester",
             goal="Test things",
             agent_type="DurableAgent",
-            llm_config=LlmClientConfig(provider="openai", model_name="gpt-4"),
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
             agent_topic="test.requests",
             memory_store_name="testmemory",
             memory_session_id="test-session",
@@ -1812,7 +1812,7 @@ class TestAgentConverter:
             role="Tester",
             goal="Test registry path",
             agent_type="DurableAgent",
-            llm_config=LlmClientConfig(provider="openai", model_name="gpt-4"),
+            llm_config=LlmProviderConfig(provider="openai", model_name="gpt-4"),
             agent_topic="test.requests",
             memory_store_name="testmemory",
             memory_session_id="test-session",
@@ -1856,7 +1856,7 @@ class TestAgentConverter:
         ):
             try:
                 result = converter._create_llm_client(
-                    LlmClientConfig(provider="openai", model_name="gpt-4")
+                    LlmProviderConfig(provider="openai", model_name="gpt-4")
                 )
                 assert result is not None
             except (ImportError, ConversionError):
@@ -1872,7 +1872,7 @@ class TestAgentConverter:
         with patch.dict("sys.modules", {"dapr_agents": mock_module}):
             try:
                 result = converter._create_llm_client(
-                    LlmClientConfig(provider="openai", model_name="gpt-4o")
+                    LlmProviderConfig(provider="openai", model_name="gpt-4o")
                 )
                 assert result is not None
                 # Verify it used model_name value, not fallback "gpt-4"
@@ -2119,8 +2119,8 @@ class TestAgentConverter:
     def test_create_llm_client_ollama_provider(self) -> None:
         """Test _create_llm_client with Ollama provider."""
         converter = AgentConverter()
-        llm_config = LlmClientConfig(
-            provider="ollama", model_name="llama2", url="http://custom:11434"
+        llm_config = LlmProviderConfig(
+            provider="ollama", model_name="llama2", base_url="http://custom:11434"
         )
 
         with patch.dict(
@@ -2139,7 +2139,9 @@ class TestAgentConverter:
     def test_create_llm_client_vllm_provider(self) -> None:
         """Test _create_llm_client with vLLM provider."""
         converter = AgentConverter()
-        llm_config = LlmClientConfig(provider="vllm", model_name="mistral", url="http://vllm:8000")
+        llm_config = LlmProviderConfig(
+            provider="vllm", model_name="mistral", base_url="http://vllm:8000"
+        )
 
         with patch.dict(
             "sys.modules",
@@ -2157,7 +2159,7 @@ class TestAgentConverter:
     def test_create_llm_client_unknown_provider(self) -> None:
         """Test _create_llm_client with unknown provider defaults to OpenAI."""
         converter = AgentConverter()
-        llm_config = LlmClientConfig(provider="unknown_provider", model_name="custom-model")
+        llm_config = LlmProviderConfig(provider="unknown_provider", model_name="custom-model")
 
         with patch.dict(
             "sys.modules",
@@ -2175,7 +2177,7 @@ class TestAgentConverter:
     def test_create_llm_client_import_error(self) -> None:
         """Test _create_llm_client raises ConversionError on ImportError."""
         converter = AgentConverter()
-        llm_config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        llm_config = LlmProviderConfig(provider="openai", model_name="gpt-4")
 
         # Remove dapr_agents from modules to trigger ImportError
         with patch.dict("sys.modules", {"dapr_agents": None}):
@@ -3791,7 +3793,7 @@ class TestConverterRegistry:
         registry.register(llm_converter)
         registry.register(tool_converter)
 
-        config = LlmClientConfig(provider="openai", model_name="gpt-4")
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4")
         found = registry.get_converter(config)
         assert found is llm_converter
 
@@ -3818,7 +3820,7 @@ class TestConverterRegistry:
         )
 
         result = registry.convert_from_oas(config)
-        assert isinstance(result, LlmClientConfig)
+        assert isinstance(result, LlmProviderConfig)
         assert result.model_name == "llama"
 
     def test_convert_from_oas_no_converter(self) -> None:
@@ -3835,10 +3837,10 @@ class TestConverterRegistry:
         llm_converter = LlmConfigConverter()
         registry.register(llm_converter)
 
-        config = LlmClientConfig(
+        config = LlmProviderConfig(
             provider="vllm",
             model_name="llama",
-            url="http://localhost:8000",
+            base_url="http://localhost:8000",
         )
 
         result = registry.convert_to_oas(config)

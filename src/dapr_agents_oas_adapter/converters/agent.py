@@ -13,7 +13,7 @@ from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
-    LlmClientConfig,
+    LlmProviderConfig,
     ToolDefinition,
     ToolRegistry,
 )
@@ -495,7 +495,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 suggestion="Check agent configuration and ensure all required fields are set",
             ) from e
 
-    def _create_llm_client(self, llm_config: LlmClientConfig | None) -> Any:
+    def _create_llm_client(self, llm_config: LlmProviderConfig | None) -> Any:
         """Create a Dapr LLM client from configuration.
 
         Args:
@@ -520,12 +520,12 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 # Treat Ollama as an OpenAI-compatible endpoint.
                 from dapr_agents import OpenAIChatClient
 
-                url = llm_config.url if llm_config else "http://localhost:11434"
+                url = llm_config.base_url if llm_config else "http://localhost:11434"
                 return OpenAIChatClient(model=model_name, base_url=url or "http://localhost:11434")
             if provider == "vllm":
                 from dapr_agents import OpenAIChatClient
 
-                url = llm_config.url if llm_config else None
+                url = llm_config.base_url if llm_config else None
                 return OpenAIChatClient(model=model_name, base_url=url)
             # Default to OpenAI-compatible client
             from dapr_agents import OpenAIChatClient
@@ -584,7 +584,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
 
         return tools
 
-    def _extract_llm_config_typed(self, component: OASAgent) -> LlmClientConfig | None:
+    def _extract_llm_config_typed(self, component: OASAgent) -> LlmProviderConfig | None:
         """Extract typed LLM configuration from an OAS Agent."""
         llm_config = getattr(component, "llm_config", None)
         if llm_config:

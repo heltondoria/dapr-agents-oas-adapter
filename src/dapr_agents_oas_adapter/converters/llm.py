@@ -9,17 +9,17 @@ from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DAPR_PROVIDER_TO_OAS_LLM,
     OAS_LLM_TO_DAPR_PROVIDER,
-    LlmClientConfig,
+    LlmProviderConfig,
     ToolRegistry,
 )
 from dapr_agents_oas_adapter.utils import generate_id
 
 
-class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
+class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
     """Converter for OAS LlmConfig <-> Dapr LLM client configuration.
 
     Supports conversion between various OAS LLM configurations
-    (VllmConfig, OpenAiConfig, OllamaConfig) and Dapr's LlmClientConfig.
+    (VllmConfig, OpenAiConfig, OllamaConfig) and Dapr's LlmProviderConfig.
     """
 
     # Mapping of OAS LLM config types to their classes
@@ -33,14 +33,14 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         """Initialize the converter."""
         super().__init__(tool_registry)
 
-    def from_oas(self, component: LlmConfig) -> LlmClientConfig:
-        """Convert an OAS LlmConfig to Dapr LlmClientConfig.
+    def from_oas(self, component: LlmConfig) -> LlmProviderConfig:
+        """Convert an OAS LlmConfig to Dapr LlmProviderConfig.
 
         Args:
             component: The OAS LlmConfig to convert
 
         Returns:
-            Dapr LlmClientConfig with equivalent settings
+            Dapr LlmProviderConfig with equivalent settings
 
         Raises:
             ConversionError: If the LLM config type is not supported
@@ -83,21 +83,21 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         if component_type == "OpenAIConfig":
             api_key = getattr(component, "api_key", None)
 
-        return LlmClientConfig(
+        return LlmProviderConfig(
             provider=provider,
             model_name=model_name,
-            url=url,
+            base_url=url,
             api_key=api_key,
             temperature=float(temperature) if temperature else 0.7,
             max_tokens=int(max_tokens) if max_tokens else None,
             extra_params=extra_params,
         )
 
-    def to_oas(self, component: LlmClientConfig) -> VllmConfig | OpenAiConfig | OllamaConfig:
-        """Convert a Dapr LlmClientConfig to OAS LlmConfig.
+    def to_oas(self, component: LlmProviderConfig) -> VllmConfig | OpenAiConfig | OllamaConfig:
+        """Convert a Dapr LlmProviderConfig to OAS LlmConfig.
 
         Args:
-            component: The Dapr LlmClientConfig to convert
+            component: The Dapr LlmProviderConfig to convert
 
         Returns:
             OAS LlmConfig with equivalent settings
@@ -132,7 +132,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
                 id=config_id,
                 name=name,
                 model_id=component.model_name,
-                url=component.url or "",
+                url=component.base_url or "",
             )
         if oas_type == "OpenAIConfig":
             return OpenAiConfig(
@@ -145,7 +145,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
                 id=config_id,
                 name=name,
                 model_id=component.model_name,
-                url=component.url or "http://localhost:11434",
+                url=component.base_url or "http://localhost:11434",
             )
         raise ConversionError(  # pragma: no cover
             f"Unhandled OAS type: {oas_type}",
@@ -164,7 +164,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         """
         if isinstance(component, LlmConfig):
             return True
-        if isinstance(component, LlmClientConfig):
+        if isinstance(component, LlmProviderConfig):
             return True
         # Check for dict representation
         if isinstance(component, dict):
@@ -172,33 +172,33 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
             return comp_type in self.OAS_LLM_TYPES
         return False
 
-    def from_dict(self, config_dict: dict[str, Any]) -> LlmClientConfig:
-        """Convert a dictionary representation to LlmClientConfig.
+    def from_dict(self, config_dict: dict[str, Any]) -> LlmProviderConfig:
+        """Convert a dictionary representation to LlmProviderConfig.
 
         Args:
             config_dict: Dictionary with LLM configuration
 
         Returns:
-            LlmClientConfig with the converted settings
+            LlmProviderConfig with the converted settings
         """
         component_type = config_dict.get("component_type", "VllmConfig")
         provider = OAS_LLM_TO_DAPR_PROVIDER.get(component_type, "openai")
 
-        return LlmClientConfig(
+        return LlmProviderConfig(
             provider=provider,
             model_name=config_dict.get("model_name") or config_dict.get("model_id", ""),
-            url=config_dict.get("url"),
+            base_url=config_dict.get("url"),
             api_key=config_dict.get("api_key"),
             temperature=config_dict.get("temperature", 0.7),
             max_tokens=config_dict.get("max_tokens"),
             extra_params=config_dict.get("default_generation_parameters", {}),
         )
 
-    def to_dict(self, config: LlmClientConfig) -> dict[str, Any]:
-        """Convert LlmClientConfig to a dictionary representation.
+    def to_dict(self, config: LlmProviderConfig) -> dict[str, Any]:
+        """Convert LlmProviderConfig to a dictionary representation.
 
         Args:
-            config: The LlmClientConfig to convert
+            config: The LlmProviderConfig to convert
 
         Returns:
             Dictionary representation of the config
@@ -212,8 +212,8 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
             "model_id": config.model_name,
         }
 
-        if config.url:
-            result["url"] = config.url
+        if config.base_url:
+            result["url"] = config.base_url
         if config.api_key:
             result["api_key"] = config.api_key
 

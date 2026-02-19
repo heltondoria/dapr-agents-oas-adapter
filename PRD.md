@@ -1235,17 +1235,27 @@ agent = loader.create_agent(config)
 
 ```python
 class ToolDefinition(BaseModel):
-    """Tool definition extracted from OAS specification."""
+    """Definition for a converted tool."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
-    name: str = Field(description="Tool function name")
-    description: str = Field(default="", description="Human-readable tool description")
-    tool_type: str = Field(description="Tool type: server, mcp")
-    input_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for tool inputs")
-    output_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for tool outputs")
-    transport_config: dict[str, str] | None = Field(default=None, description="MCP transport configuration")
+    name: str = Field(description="Tool name")
+    description: str = Field(description="Tool description")
+    tool_type: str = Field(default="function", description="Type of tool (function, mcp, api)")
+    inputs: list[PropertySchema] = Field(default_factory=list, description="Input schemas")
+    outputs: list[PropertySchema] = Field(default_factory=list, description="Output schemas")
+    implementation: SkipJsonSchema[Callable[..., Any] | None] = Field(
+        default=None, description="Tool implementation callable"
+    )
+    transport_config: dict[str, Any] | None = Field(
+        default=None, description="MCP transport configuration (SSE/HTTP)"
+    )
 ```
+
+> **Note:** `inputs` and `outputs` use the OAS list-based `PropertySchema` model
+> (each item is a `dict[str, Any]` describing a single property) rather than a
+> monolithic JSON Schema dict. This aligns with the Open Agent Spec's per-property
+> I/O design.
 
 #### DaprAgentConfig
 
@@ -1595,21 +1605,27 @@ class FlowConverter:
 **Current State:** No caching, repeated conversions re-process
 **Target State:** Optional conversion cache
 
-**Implementation:**
+**Implementation (composition pattern):**
 ```python
-class CachedLoader(DaprAgentSpecLoader):
-    def __init__(self, cache: ConversionCache | None = None, **kwargs):
-        super().__init__(**kwargs)
+class CachedLoader:
+    """Caching wrapper around any DaprAgentSpecLoader (composition over inheritance)."""
+
+    def __init__(self, loader: DaprAgentSpecLoader, cache: CacheBackend | None = None):
+        self._loader = loader
         self._cache = cache or InMemoryCache()
 
     def load_yaml(self, content: str) -> DaprAgentConfig | WorkflowDefinition:
         cache_key = hashlib.sha256(content.encode()).hexdigest()
         if cached := self._cache.get(cache_key):
             return cached
-        result = super().load_yaml(content)
+        result = self._loader.load_yaml(content)
         self._cache.set(cache_key, result)
         return result
 ```
+
+> **Design note:** Composition (wrapping a loader instance) is preferred over
+> inheritance because it keeps the cache layer decoupled from the loader hierarchy,
+> works transparently with `StrictLoader`, and simplifies testing.
 
 **Acceptance Criteria:**
 - [ ] Cache hit avoids re-parsing
@@ -1680,32 +1696,59 @@ def test_agent_roundtrip_preserves_data(agent_config):
 
 #### RF-012: Add Integration Tests
 **Current State:** Unit tests with mocks
-**Target State:** Integration tests with real Dapr runtime
+**Target State:** Integration tests with real Dapr runtime via GitHub Actions
+
+**CI approach:** Use `dapr/setup-dapr@v2` GitHub Action with `dapr init --slim`
+(no Docker dependency). Python has no official Testcontainers Dapr module, so
+the Action-based approach is the standard pattern.
 
 **Implementation:**
+```yaml
+# .github/workflows/integration.yml
+name: Integration Tests
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dapr/setup-dapr@v2
+        with: { version: '1.14.4' }
+      - run: dapr init --slim
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --all-groups
+      - run: >-
+          dapr run --app-id test-adapter --dapr-http-port 3500 --
+          uv run pytest tests/integration/ -m integration -v
+```
+
 ```python
-@pytest.fixture(scope="session")
-def dapr_runtime():
-    # Start Dapr sidecar in test mode
-    with DaprTestContainer() as container:
-        yield container.client
+# tests/integration/conftest.py
+import pytest, httpx, time
 
-def test_workflow_executes_in_dapr(dapr_runtime):
-    loader = DaprAgentSpecLoader()
-    workflow_def = loader.load_yaml_file("fixtures/simple_flow.yaml")
-    workflow = loader.create_workflow(workflow_def)
+def _dapr_sidecar_available(port: int = 3500, retries: int = 3) -> bool:
+    for _ in range(retries):
+        try:
+            r = httpx.get(f"http://localhost:{port}/v1.0/healthz", timeout=2)
+            if r.status_code == 204:
+                return True
+        except httpx.ConnectError:
+            pass
+        time.sleep(2)
+    return False
 
-    runtime = WorkflowRuntime()
-    runtime.register_workflow(workflow)
-    runtime.start()
-
-    result = runtime.run_workflow(workflow.__name__, {"input": "test"})
-    assert result["status"] == "completed"
+@pytest.fixture(scope="session", autouse=True)
+def _require_dapr():
+    if not _dapr_sidecar_available():
+        pytest.skip("Dapr sidecar not available")
 ```
 
 **Acceptance Criteria:**
-- [ ] CI runs integration tests (separate job)
-- [ ] Real Dapr runtime exercises all paths
+- [ ] CI runs integration tests (separate job via GitHub Action)
+- [ ] `dapr/setup-dapr@v2` + `dapr init --slim` provides Dapr runtime
+- [ ] Tests skip gracefully when sidecar is absent (local dev)
 - [ ] Test fixtures cover all node types
 
 #### RF-013: Generate API Documentation
