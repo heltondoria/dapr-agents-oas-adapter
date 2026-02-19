@@ -518,7 +518,11 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         """
         try:
             provider = llm_config.get("provider", "openai") if llm_config else "openai"
-            model_name = llm_config.get("model_id", "gpt-4") if llm_config else "gpt-4"
+            model_name = (
+                llm_config.get("model_name") or llm_config.get("model_id", "gpt-4")
+                if llm_config
+                else "gpt-4"
+            )
 
             if provider == "openai":
                 from dapr_agents import OpenAIChatClient

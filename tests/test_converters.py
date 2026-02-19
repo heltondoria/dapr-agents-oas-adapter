@@ -178,6 +178,27 @@ class TestLlmConfigConverter:
         assert result.temperature == 0.5
         assert result.max_tokens == 1000
 
+    def test_from_dict_with_model_name_key(self) -> None:
+        """Test from_dict prefers model_name over model_id when both present."""
+        converter = LlmConfigConverter()
+        config_dict = {
+            "component_type": "OpenAIConfig",
+            "model_name": "gpt-4o",
+            "model_id": "gpt-4",
+        }
+        result = converter.from_dict(config_dict)
+        assert result.model_name == "gpt-4o"
+
+    def test_from_dict_with_only_model_name_key(self) -> None:
+        """Test from_dict accepts model_name without model_id."""
+        converter = LlmConfigConverter()
+        config_dict = {
+            "component_type": "OpenAIConfig",
+            "model_name": "gpt-4o",
+        }
+        result = converter.from_dict(config_dict)
+        assert result.model_name == "gpt-4o"
+
     def test_from_dict_vllm(self) -> None:
         """Test from_dict with VllmConfig."""
         converter = LlmConfigConverter()
@@ -1846,6 +1867,23 @@ class TestAgentConverter:
             try:
                 result = converter._create_llm_client({"provider": "openai", "model_id": "gpt-4"})
                 assert result is not None
+            except (ImportError, ConversionError):
+                pass
+
+    def test_create_llm_client_prefers_model_name_over_model_id(self) -> None:
+        """Test _create_llm_client reads model_name key when present."""
+        converter = AgentConverter()
+        mock_client = MagicMock()
+        mock_module = MagicMock(**{"OpenAIChatClient.return_value": mock_client})
+
+        with patch.dict("sys.modules", {"dapr_agents": mock_module}):
+            try:
+                result = converter._create_llm_client(
+                    {"provider": "openai", "model_name": "gpt-4o"}
+                )
+                assert result is not None
+                # Verify it used model_name value, not fallback "gpt-4"
+                mock_module.OpenAIChatClient.assert_called_once_with(model="gpt-4o")
             except (ImportError, ConversionError):
                 pass
 

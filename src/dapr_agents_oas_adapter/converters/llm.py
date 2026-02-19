@@ -186,7 +186,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
 
         return LlmClientConfig(
             provider=provider,
-            model_name=config_dict.get("model_id", ""),
+            model_name=config_dict.get("model_name") or config_dict.get("model_id", ""),
             url=config_dict.get("url"),
             api_key=config_dict.get("api_key"),
             temperature=config_dict.get("temperature", 0.7),
