@@ -78,11 +78,11 @@ Definition for a converted tool.
       show_root_heading: true
       show_source: true
 
-## LlmClientConfig
+## LlmProviderConfig
 
-Configuration for Dapr LLM client.
+Configuration for LLM provider.
 
-::: dapr_agents_oas_adapter.types.LlmClientConfig
+::: dapr_agents_oas_adapter.types.LlmProviderConfig
     options:
       show_root_heading: true
       show_source: true
