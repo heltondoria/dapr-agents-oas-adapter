@@ -16,9 +16,7 @@ from pyagentspec.flows.nodes import (
     ToolNode,
 )
 
-from dapr_agents_oas_adapter.converters.base import (
-    ComponentConverter,
-)
+from dapr_agents_oas_adapter.converters.base import ComponentConverter
 from dapr_agents_oas_adapter.types import (
     ToolRegistry,
     WorkflowTaskDefinition,
@@ -88,14 +86,14 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 inputs=inputs if inputs else None,
                 outputs=inputs if inputs else None,  # StartNode passes inputs as outputs
             )
-        elif node_class == EndNode:
+        if node_class == EndNode:
             return EndNode(
                 id=node_id,
                 name=component.name,
                 inputs=inputs if inputs else None,
                 outputs=outputs if outputs else None,
             )
-        elif node_class == LlmNode:
+        if node_class == LlmNode:
             # Get or create default LLM config
             llm_config = component.config.get("llm_config")
             if llm_config is None:
@@ -115,7 +113,7 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 prompt_template=component.config.get("prompt_template", ""),
                 llm_config=llm_config,
             )
-        elif node_class == ToolNode:
+        if node_class == ToolNode:
             # Get or create default tool
             tool = component.config.get("tool")
             if tool is None:
@@ -131,22 +129,21 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 outputs=outputs if outputs else None,
                 tool=tool,
             )
-        else:
-            # Default to a generic node representation (LlmNode)
-            default_llm = VllmConfig(
-                id=generate_id("llm"),
-                name="default_llm",
-                model_id="gpt-4",
-                url="https://api.openai.com/v1",
-            )
-            return LlmNode(
-                id=node_id,
-                name=component.name,
-                inputs=inputs if inputs else None,
-                outputs=outputs if outputs else None,
-                prompt_template=component.config.get("prompt_template", ""),
-                llm_config=default_llm,
-            )
+        # Default to a generic node representation (LlmNode)
+        default_llm = VllmConfig(
+            id=generate_id("llm"),
+            name="default_llm",
+            model_id="gpt-4",
+            url="https://api.openai.com/v1",
+        )
+        return LlmNode(
+            id=node_id,
+            name=component.name,
+            inputs=inputs if inputs else None,
+            outputs=outputs if outputs else None,
+            prompt_template=component.config.get("prompt_template", ""),
+            llm_config=default_llm,
+        )
 
     def can_convert(self, component: Any) -> bool:
         """Check if this converter can handle the given component."""

@@ -4,10 +4,8 @@ from typing import Any, ClassVar
 
 from pyagentspec.llms import LlmConfig, OllamaConfig, OpenAiConfig, VllmConfig
 
-from dapr_agents_oas_adapter.converters.base import (
-    ComponentConverter,
-    ConversionError,
-)
+from dapr_agents_oas_adapter.converters.base import ComponentConverter
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DAPR_PROVIDER_TO_OAS_LLM,
     OAS_LLM_TO_DAPR_PROVIDER,
@@ -61,7 +59,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
             )
 
         # Extract common fields
-        model_id = getattr(component, "model_id", "")
+        model_name = getattr(component, "model_id", "")
         url = getattr(component, "url", None)
 
         # Extract generation parameters
@@ -70,12 +68,11 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         if default_gen_params:
             if isinstance(default_gen_params, dict):
                 extra_params = default_gen_params.copy()
+            # Handle pydantic model or dataclass
+            elif hasattr(default_gen_params, "__iter__"):
+                extra_params = dict(default_gen_params)
             else:
-                # Handle pydantic model or dataclass
-                if hasattr(default_gen_params, "__iter__"):
-                    extra_params = dict(default_gen_params)
-                else:
-                    extra_params = {}
+                extra_params = {}
 
         # Extract temperature and max_tokens from extra params if present
         temperature = extra_params.pop("temperature", 0.7)
@@ -88,7 +85,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
 
         return LlmClientConfig(
             provider=provider,
-            model_id=model_id,
+            model_name=model_name,
             url=url,
             api_key=api_key,
             temperature=float(temperature) if temperature else 0.7,
@@ -128,34 +125,33 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
 
         # Build the OAS LlmConfig
         config_id = generate_id("llm")
-        name = f"{component.provider}_{component.model_id}"
+        name = f"{component.provider}_{component.model_name}"
 
         if oas_type == "VllmConfig":
             return VllmConfig(
                 id=config_id,
                 name=name,
-                model_id=component.model_id,
+                model_id=component.model_name,
                 url=component.url or "",
             )
-        elif oas_type == "OpenAIConfig":
+        if oas_type == "OpenAIConfig":
             return OpenAiConfig(
                 id=config_id,
                 name=name,
-                model_id=component.model_id,
+                model_id=component.model_name,
             )
-        elif oas_type == "OllamaConfig":
+        if oas_type == "OllamaConfig":
             return OllamaConfig(
                 id=config_id,
                 name=name,
-                model_id=component.model_id,
+                model_id=component.model_name,
                 url=component.url or "http://localhost:11434",
             )
-        else:
-            raise ConversionError(
-                f"Unhandled OAS type: {oas_type}",
-                component,
-                suggestion="This is an internal error, please report it",
-            )
+        raise ConversionError(  # pragma: no cover
+            f"Unhandled OAS type: {oas_type}",
+            component,
+            suggestion="This is an internal error, please report it",
+        )
 
     def can_convert(self, component: Any) -> bool:
         """Check if this converter can handle the given component.
@@ -190,7 +186,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
 
         return LlmClientConfig(
             provider=provider,
-            model_id=config_dict.get("model_id", ""),
+            model_name=config_dict.get("model_name") or config_dict.get("model_id", ""),
             url=config_dict.get("url"),
             api_key=config_dict.get("api_key"),
             temperature=config_dict.get("temperature", 0.7),
@@ -212,8 +208,8 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
         result: dict[str, Any] = {
             "component_type": oas_type,
             "id": generate_id("llm"),
-            "name": f"{config.provider}_{config.model_id}",
-            "model_id": config.model_id,
+            "name": f"{config.provider}_{config.model_name}",
+            "model_id": config.model_name,
         }
 
         if config.url:

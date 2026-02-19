@@ -26,7 +26,7 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
-from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
+from examples._shared.optional_dotenv import try_load_dotenv
 
 try_load_dotenv()
 

@@ -77,7 +77,7 @@ def export_all(*, out_dir: Path) -> list[Path]:
 def main() -> int:
     out_dir = Path(__file__).parent / "exported"
     for path in export_all(out_dir=out_dir):
-        print(f"Wrote: {path}")
+        print(f"Wrote {path}")
     return 0
 
 

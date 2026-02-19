@@ -65,7 +65,7 @@ def llm_client_configs(draw: st.DrawFn) -> LlmClientConfig:
     """Generate valid LlmClientConfig instances."""
     return LlmClientConfig(
         provider=draw(st.sampled_from(["openai", "ollama", "vllm", "oci"])),
-        model_id=draw(
+        model_name=draw(
             st.text(min_size=1, max_size=50, alphabet="abcdefghijklmnopqrstuvwxyz0123456789-_.")
         ),
         url=draw(st.none() | st.just("http://localhost:8000")),
@@ -89,7 +89,7 @@ def tool_definitions(draw: st.DrawFn) -> ToolDefinition:
         inputs=inputs,
         outputs=outputs,
         implementation=None,
-        mcp_transport=None,
+        transport_config=None,
     )
 
 
@@ -227,7 +227,7 @@ class TestLlmClientConfigProperties:
     def test_config_is_valid(self, config: LlmClientConfig) -> None:
         """LlmClientConfig instances are always valid."""
         assert config.provider in ["openai", "ollama", "vllm", "oci"]
-        assert len(config.model_id) > 0
+        assert len(config.model_name) > 0
         assert 0.0 <= config.temperature <= 2.0
 
     @given(llm_client_configs())
@@ -237,7 +237,7 @@ class TestLlmClientConfigProperties:
         data = config.model_dump()
         restored = LlmClientConfig.model_validate(data)
         assert restored.provider == config.provider
-        assert restored.model_id == config.model_id
+        assert restored.model_name == config.model_name
         assert restored.temperature == config.temperature
 
 
@@ -335,8 +335,10 @@ class TestDaprAgentConfigProperties:
         """DaprAgentConfig always has required fields."""
         assert len(agent.name) > 0
         # role and goal are set by our strategy to non-empty strings
-        assert agent.role is not None and len(agent.role) > 0
-        assert agent.goal is not None and len(agent.goal) > 0
+        assert agent.role is not None
+        assert len(agent.role) > 0
+        assert agent.goal is not None
+        assert len(agent.goal) > 0
 
     @given(dapr_agent_configs())
     @settings(max_examples=30)

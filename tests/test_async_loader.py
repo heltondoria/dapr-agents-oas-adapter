@@ -47,10 +47,10 @@ class TestAsyncDaprAgentSpecLoader:
         loader = AsyncDaprAgentSpecLoader(tool_registry=registry)
         assert "my_tool" in loader.tool_registry
 
-    def test_init_with_max_workers(self) -> None:
-        """Test initialization with max_workers."""
-        loader = AsyncDaprAgentSpecLoader(max_workers=4)
-        assert loader._executor._max_workers == 4
+    def test_init_creates_sync_loader(self) -> None:
+        """Test initialization creates the underlying sync loader."""
+        loader = AsyncDaprAgentSpecLoader()
+        assert loader.get_sync_loader() is not None
 
     def test_tool_registry_setter(self) -> None:
         """Test setting tool registry."""

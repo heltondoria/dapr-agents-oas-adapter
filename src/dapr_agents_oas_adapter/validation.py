@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
 
+from dapr_agents_oas_adapter.exceptions import ValidationError as _BaseValidationError
 from dapr_agents_oas_adapter.types import (
     WorkflowDefinition,
     WorkflowEdgeDefinition,
@@ -106,16 +107,29 @@ class ValidationResult:
             raise WorkflowValidationError(self.errors)
 
 
-class WorkflowValidationError(Exception):
+class WorkflowValidationError(_BaseValidationError):
     """Exception raised when workflow validation fails."""
 
-    def __init__(self, issues: list[ValidationIssue]) -> None:
-        """Initialize with list of validation issues."""
-        self.issues = issues
-        messages = [str(issue) for issue in issues]
-        super().__init__(
-            f"Workflow validation failed with {len(issues)} error(s):\n" + "\n".join(messages)
-        )
+    def __init__(
+        self,
+        issues: list[ValidationIssue] | None = None,
+        message: str = "",
+        field_path: str | None = None,
+    ) -> None:
+        """Initialize with list of validation issues.
+
+        Args:
+            issues: List of validation issues found during validation
+            message: Optional error message (used by parent constructor)
+            field_path: Optional field path (used by parent constructor)
+        """
+        self.issues: list[ValidationIssue] = issues or []
+        if not message and self.issues:
+            messages = [str(issue) for issue in self.issues]
+            message = f"Workflow validation failed with {len(self.issues)} error(s):\n" + "\n".join(
+                messages
+            )
+        super().__init__(message or "Workflow validation failed", field_path)
 
 
 class WorkflowValidator:
@@ -476,16 +490,30 @@ def validate_workflow_dict(
 # =============================================================================
 
 
-class OASSchemaValidationError(Exception):
+class OASSchemaValidationError(_BaseValidationError):
     """Exception raised when OAS schema validation fails."""
 
-    def __init__(self, issues: list[ValidationIssue]) -> None:
-        """Initialize with list of validation issues."""
-        self.issues = issues
-        messages = [str(issue) for issue in issues]
-        super().__init__(
-            f"OAS schema validation failed with {len(issues)} error(s):\n" + "\n".join(messages)
-        )
+    def __init__(
+        self,
+        issues: list[ValidationIssue] | None = None,
+        message: str = "",
+        field_path: str | None = None,
+    ) -> None:
+        """Initialize with list of validation issues.
+
+        Args:
+            issues: List of validation issues found during validation
+            message: Optional error message (used by parent constructor)
+            field_path: Optional field path (used by parent constructor)
+        """
+        self.issues: list[ValidationIssue] = issues or []
+        if not message and self.issues:
+            messages = [str(issue) for issue in self.issues]
+            message = (
+                f"OAS schema validation failed with {len(self.issues)} error(s):\n"
+                + "\n".join(messages)
+            )
+        super().__init__(message or "OAS schema validation failed", field_path)
 
 
 class OASSchemaValidator:
@@ -565,18 +593,17 @@ class OASSchemaValidator:
 
         if component_type == "Agent":
             return self.validate_agent(data, raise_on_error=raise_on_error)
-        elif component_type == "Flow":
+        if component_type == "Flow":
             return self.validate_flow(data, raise_on_error=raise_on_error)
-        else:
-            result = ValidationResult()
-            result.add_error(
-                f"Unknown or missing component_type: '{component_type}'",
-                field="component_type",
-                suggestion="Set component_type to 'Agent' or 'Flow'",
-            )
-            if raise_on_error:
-                raise OASSchemaValidationError(result.errors)
-            return result
+        result = ValidationResult()
+        result.add_error(
+            f"Unknown or missing component_type: '{component_type}'",
+            field="component_type",
+            suggestion="Set component_type to 'Agent' or 'Flow'",
+        )
+        if raise_on_error:
+            raise OASSchemaValidationError(result.errors)
+        return result
 
     def validate_agent(
         self,

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from dapr_agents_oas_adapter.validation import ValidationResult
 
 from pyagentspec.agent import Agent as OASAgent
@@ -14,9 +15,9 @@ from pyagentspec.flows.flow import Flow
 from pyagentspec.serialization import AgentSpecDeserializer
 
 from dapr_agents_oas_adapter.converters.agent import AgentConverter
-from dapr_agents_oas_adapter.converters.base import ConversionError
 from dapr_agents_oas_adapter.converters.flow import FlowConverter
-from dapr_agents_oas_adapter.logging import get_logger, log_operation
+from dapr_agents_oas_adapter.exceptions import ConversionError
+from dapr_agents_oas_adapter.logging import get_logger
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     NamedCallable,
@@ -65,7 +66,7 @@ class DaprAgentSpecLoader:
         self._deserializer = AgentSpecDeserializer()
         self._agent_converter = AgentConverter(self._tool_registry)
         self._flow_converter = FlowConverter(self._tool_registry)
-        self._logger = get_logger("DaprAgentSpecLoader")
+        self._logger = get_logger()
 
     @property
     def tool_registry(self) -> ToolRegistry:
@@ -108,10 +109,10 @@ class DaprAgentSpecLoader:
         except ConversionError:
             raise
         except Exception as e:
+            self._logger.error("load_json failed", exc_info=True)
             raise ConversionError(
                 "Failed to load JSON",
                 suggestion="Ensure the JSON is valid and follows the OAS schema",
-                caused_by=e,
             ) from e
 
     def load_yaml(self, yaml_content: str) -> DaprAgentConfig | WorkflowDefinition:
@@ -132,10 +133,10 @@ class DaprAgentSpecLoader:
         except ConversionError:
             raise
         except Exception as e:
+            self._logger.error("load_yaml failed", exc_info=True)
             raise ConversionError(
                 "Failed to load YAML",
                 suggestion="Ensure the YAML is valid and follows the OAS schema",
-                caused_by=e,
             ) from e
 
     def load_json_file(self, file_path: str | Path) -> DaprAgentConfig | WorkflowDefinition:
@@ -197,30 +198,29 @@ class DaprAgentSpecLoader:
         component_type = type(component).__name__
         component_name = getattr(component, "name", None) or getattr(component, "id", None)
 
-        with log_operation(
-            "load_component",
-            self._logger,
-            component_type=component_type,
-            component_name=component_name,
-        ):
-            if isinstance(component, OASAgent):
-                agent_config = self._agent_converter.from_oas(component)
-                self._logger.debug("agent_converted", agent_name=agent_config.name)
-                return agent_config
-            elif isinstance(component, Flow):
-                workflow_def = self._flow_converter.from_oas(component)
-                self._logger.debug(
-                    "workflow_converted",
-                    workflow_name=workflow_def.name,
-                    task_count=len(workflow_def.tasks),
-                )
-                return workflow_def
-            else:
-                raise ConversionError(
-                    f"Unsupported component type: {component_type}",
-                    component,
-                    suggestion="Only Agent and Flow component types are supported",
-                )
+        self._logger.info(
+            "load_component started",
+            extra={"component_type": component_type, "component_name": component_name},
+        )
+        if isinstance(component, OASAgent):
+            agent_config = self._agent_converter.from_oas(component)
+            self._logger.debug("agent_converted", extra={"agent_name": agent_config.name})
+            return agent_config
+        if isinstance(component, Flow):
+            workflow_def = self._flow_converter.from_oas(component)
+            self._logger.debug(
+                "workflow_converted",
+                extra={
+                    "workflow_name": workflow_def.name,
+                    "task_count": len(workflow_def.tasks),
+                },
+            )
+            return workflow_def
+        raise ConversionError(
+            f"Unsupported component type: {component_type}",
+            component,
+            suggestion="Only Agent and Flow component types are supported",
+        )
 
     def load_dict(self, spec_dict: dict[str, Any]) -> DaprAgentConfig | WorkflowDefinition:
         """Load an OAS specification from a dictionary.
@@ -237,30 +237,29 @@ class DaprAgentSpecLoader:
         component_type = spec_dict.get("component_type", "")
         component_name = spec_dict.get("name") or spec_dict.get("id")
 
-        with log_operation(
-            "load_dict",
-            self._logger,
-            component_type=component_type,
-            component_name=component_name,
-        ):
-            if component_type == "Agent":
-                agent_config = self._agent_converter.from_dict(spec_dict)
-                self._logger.debug("agent_loaded_from_dict", agent_name=agent_config.name)
-                return agent_config
-            elif component_type == "Flow":
-                workflow_def = self._flow_converter.from_dict(spec_dict)
-                self._logger.debug(
-                    "workflow_loaded_from_dict",
-                    workflow_name=workflow_def.name,
-                    task_count=len(workflow_def.tasks),
-                )
-                return workflow_def
-            else:
-                raise ConversionError(
-                    f"Unsupported component type: {component_type}",
-                    spec_dict,
-                    suggestion="Set 'component_type' to 'Agent' or 'Flow' in the specification",
-                )
+        self._logger.info(
+            "load_dict started",
+            extra={"component_type": component_type, "component_name": component_name},
+        )
+        if component_type == "Agent":
+            agent_config = self._agent_converter.from_dict(spec_dict)
+            self._logger.debug("agent_loaded_from_dict", extra={"agent_name": agent_config.name})
+            return agent_config
+        if component_type == "Flow":
+            workflow_def = self._flow_converter.from_dict(spec_dict)
+            self._logger.debug(
+                "workflow_loaded_from_dict",
+                extra={
+                    "workflow_name": workflow_def.name,
+                    "task_count": len(workflow_def.tasks),
+                },
+            )
+            return workflow_def
+        raise ConversionError(
+            f"Unsupported component type: {component_type}",
+            spec_dict,
+            suggestion="Set 'component_type' to 'Agent' or 'Flow' in the specification",
+        )
 
     def create_agent(
         self,
@@ -279,22 +278,23 @@ class DaprAgentSpecLoader:
         Raises:
             ConversionError: If agent creation fails
         """
-        with log_operation(
-            "create_agent",
-            self._logger,
-            agent_name=config.name,
-            agent_type=config.agent_type,
-            tool_count=len(config.tools),
-        ):
-            tools = {**self._tool_registry}
-            if additional_tools:
-                tools.update(additional_tools)
-                self._logger.debug(
-                    "additional_tools_merged",
-                    additional_tool_count=len(additional_tools),
-                )
+        self._logger.info(
+            "create_agent started",
+            extra={
+                "agent_name": config.name,
+                "agent_type": config.agent_type,
+                "tool_count": len(config.tools),
+            },
+        )
+        tools = {**self._tool_registry}
+        if additional_tools:
+            tools.update(additional_tools)
+            self._logger.debug(
+                "additional_tools_merged",
+                extra={"additional_tool_count": len(additional_tools)},
+            )
 
-            return self._agent_converter.create_dapr_agent(config, tools)
+        return self._agent_converter.create_dapr_agent(config, tools)
 
     def create_workflow(
         self,
@@ -313,14 +313,15 @@ class DaprAgentSpecLoader:
         Raises:
             ConversionError: If workflow creation fails
         """
-        with log_operation(
-            "create_workflow",
-            self._logger,
-            workflow_name=workflow_def.name,
-            task_count=len(workflow_def.tasks),
-            edge_count=len(workflow_def.edges),
-        ):
-            return self._flow_converter.create_dapr_workflow(workflow_def, task_implementations)
+        self._logger.info(
+            "create_workflow started",
+            extra={
+                "workflow_name": workflow_def.name,
+                "task_count": len(workflow_def.tasks),
+                "edge_count": len(workflow_def.edges),
+            },
+        )
+        return self._flow_converter.create_dapr_workflow(workflow_def, task_implementations)
 
     def generate_workflow_code(self, workflow_def: WorkflowDefinition) -> str:
         """Generate Python code for a Dapr workflow.
@@ -438,7 +439,7 @@ class StrictLoader:
         self._loader = DaprAgentSpecLoader(tool_registry)
         self._validator = OASSchemaValidator()
         self._warn_on_unknown_fields = warn_on_unknown_fields
-        self._logger = get_logger("StrictLoader")
+        self._logger = get_logger()
 
     @property
     def loader(self) -> DaprAgentSpecLoader:
@@ -484,12 +485,11 @@ class StrictLoader:
             ConversionError: If the component type is not supported
         """
         if validate:
-            with log_operation(
-                "strict_validate_dict",
-                self._logger,
-                component_type=spec_dict.get("component_type"),
-            ):
-                self._validator.validate_component(spec_dict, raise_on_error=True)
+            self._logger.info(
+                "strict_validate_dict started",
+                extra={"component_type": spec_dict.get("component_type")},
+            )
+            self._validator.validate_component(spec_dict, raise_on_error=True)
 
         return self._loader.load_dict(spec_dict)
 
@@ -534,7 +534,6 @@ class StrictLoader:
             raise ConversionError(
                 "Invalid JSON",
                 suggestion="Ensure the JSON syntax is valid",
-                caused_by=e,
             ) from e
 
         if validate and isinstance(spec_dict, dict):
@@ -572,7 +571,6 @@ class StrictLoader:
             raise ConversionError(
                 "Invalid YAML",
                 suggestion="Ensure the YAML syntax is valid",
-                caused_by=e,
             ) from e
 
         if validate and isinstance(spec_dict, dict):

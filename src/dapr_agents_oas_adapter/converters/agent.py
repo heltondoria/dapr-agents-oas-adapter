@@ -6,12 +6,10 @@ from typing import Any
 from pyagentspec import Property
 from pyagentspec.agent import Agent as OASAgent
 
-from dapr_agents_oas_adapter.converters.base import (
-    ComponentConverter,
-    ConversionError,
-)
+from dapr_agents_oas_adapter.converters.base import ComponentConverter
 from dapr_agents_oas_adapter.converters.llm import LlmConfigConverter
 from dapr_agents_oas_adapter.converters.tool import ToolConverter
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     DaprAgentType,
@@ -362,8 +360,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             ConversionError: If agent creation fails
         """
         try:
-            from dapr_agents import AssistantAgent  # type: ignore[import-not-found]
-            from dapr_agents import tool as dapr_tool  # type: ignore[import-not-found]
+            from dapr_agents import AssistantAgent  # type: ignore[reportAttributeAccessIssue]
+            from dapr_agents import tool as dapr_tool
 
             # Merge tool registries
             all_tools = {**self._tool_registry}
@@ -384,7 +382,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             agent_type = config.agent_type or DaprAgentType.ASSISTANT_AGENT.value
 
             if agent_type == DaprAgentType.REACT_AGENT.value:
-                from dapr_agents import ReActAgent  # type: ignore[import-not-found]
+                from dapr_agents import ReActAgent  # type: ignore[reportAttributeAccessIssue]
 
                 return ReActAgent(
                     name=config.name,
@@ -392,19 +390,19 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     instructions=config.instructions,
                     tools=decorated_tools,
                 )
-            elif agent_type == DaprAgentType.DURABLE_AGENT.value:
-                from dapr_agents import DurableAgent  # type: ignore[import-not-found]
-                from dapr_agents.agents.configs import (  # type: ignore[import-not-found]
+            if agent_type == DaprAgentType.DURABLE_AGENT.value:
+                from dapr_agents import DurableAgent
+                from dapr_agents.agents.configs import (
                     AgentMemoryConfig,
                     AgentPubSubConfig,
                     AgentRegistryConfig,
                     AgentStateConfig,
                 )
                 from dapr_agents.memory import (
-                    ConversationDaprStateMemory,  # type: ignore[import-not-found]
+                    ConversationDaprStateMemory,
                 )
                 from dapr_agents.storage.daprstores.stateservice import (
-                    StateStoreService,  # type: ignore[import-not-found]
+                    StateStoreService,
                 )
 
                 # Create LLM client (required for DurableAgent)
@@ -481,32 +479,29 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     durable_agent_kwargs["registry"] = registry_config
 
                 return DurableAgent(**durable_agent_kwargs)
-            else:
-                return AssistantAgent(
-                    name=config.name,
-                    role=config.role or config.name,
-                    goal=config.goal,
-                    instructions=config.instructions,
-                    tools=decorated_tools,
-                    message_bus_name=config.message_bus_name,
-                    state_store_name=config.state_store_name,
-                    agents_registry_store_name=config.agents_registry_store_name,
-                    service_port=config.service_port,
-                )
+            return AssistantAgent(
+                name=config.name,
+                role=config.role or config.name,
+                goal=config.goal,
+                instructions=config.instructions,
+                tools=decorated_tools,
+                message_bus_name=config.message_bus_name,
+                state_store_name=config.state_store_name,
+                agents_registry_store_name=config.agents_registry_store_name,
+                service_port=config.service_port,
+            )
 
         except ImportError as e:
             raise ConversionError(
                 "Failed to import Dapr Agents",
                 config,
                 suggestion="Install dapr-agents: pip install dapr-agents",
-                caused_by=e,
             ) from e
         except Exception as e:
             raise ConversionError(
                 "Failed to create Dapr Agent",
                 config,
                 suggestion="Check agent configuration and ensure all required fields are set",
-                caused_by=e,
             ) from e
 
     def _create_llm_client(self, llm_config: dict[str, Any] | None) -> Any:
@@ -523,38 +518,40 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         """
         try:
             provider = llm_config.get("provider", "openai") if llm_config else "openai"
-            model_id = llm_config.get("model_id", "gpt-4") if llm_config else "gpt-4"
+            model_name = (
+                llm_config.get("model_name") or llm_config.get("model_id", "gpt-4")
+                if llm_config
+                else "gpt-4"
+            )
 
             if provider == "openai":
-                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
+                from dapr_agents import OpenAIChatClient
 
-                return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
-            elif provider == "ollama":
+                return OpenAIChatClient(model=model_name)
+            if provider == "ollama":
                 # Dapr Agents does not expose a dedicated Ollama client in all versions.
                 # Treat Ollama as an OpenAI-compatible endpoint.
-                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
+                from dapr_agents import OpenAIChatClient
 
                 url = (
                     llm_config.get("url", "http://localhost:11434")
                     if llm_config
                     else "http://localhost:11434"
                 )
-                return OpenAIChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
-            elif provider == "vllm":
-                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
+                return OpenAIChatClient(model=model_name, base_url=url)
+            if provider == "vllm":
+                from dapr_agents import OpenAIChatClient
 
                 url = llm_config.get("url") if llm_config else None
-                return OpenAIChatClient(model=model_id, base_url=url)  # type: ignore[abstract]
-            else:
-                # Default to OpenAI-compatible client
-                from dapr_agents import OpenAIChatClient  # type: ignore[import-not-found]
+                return OpenAIChatClient(model=model_name, base_url=url)
+            # Default to OpenAI-compatible client
+            from dapr_agents import OpenAIChatClient
 
-                return OpenAIChatClient(model=model_id)  # type: ignore[abstract]
+            return OpenAIChatClient(model=model_name)
         except ImportError as e:
             raise ConversionError(
                 "Failed to import LLM client",
                 suggestion="Install dapr-agents: pip install dapr-agents",
-                caused_by=e,
             ) from e
 
     def _determine_agent_type(self, component: OASAgent) -> DaprAgentType:

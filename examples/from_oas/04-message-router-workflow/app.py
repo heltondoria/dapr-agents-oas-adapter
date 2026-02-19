@@ -24,24 +24,24 @@ def _ensure_repo_root_on_sys_path() -> None:
 
 _ensure_repo_root_on_sys_path()
 
-import dapr.ext.workflow as wf  # noqa: E402
-from dapr.clients import DaprClient  # noqa: E402
-from dapr_agents.llm.dapr import DaprChatClient  # noqa: E402
-from dapr_agents.workflow.decorators.routers import message_router  # noqa: E402
-from dapr_agents.workflow.utils.registration import register_message_routes  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+import dapr.ext.workflow as wf
+from dapr.clients import DaprClient
+from dapr_agents.llm.dapr import DaprChatClient
+from dapr_agents.workflow.decorators.routers import message_router
+from dapr_agents.workflow.utils.registration import register_message_routes
+from pydantic import BaseModel, Field
 
-from dapr_agents_oas_adapter import DaprAgentSpecLoader  # noqa: E402
-from dapr_agents_oas_adapter.types import (  # noqa: E402
+from dapr_agents_oas_adapter import DaprAgentSpecLoader
+from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     NamedCallable,
     WorkflowDefinition,
 )
-from examples._shared.llm_workflow_activities import (  # noqa: E402
+from examples._shared.llm_workflow_activities import (
     build_llm_activities_from_workflow,
 )
-from examples._shared.optional_dotenv import try_load_dotenv  # noqa: E402
-from examples._shared.paths import find_repo_root  # noqa: E402
+from examples._shared.optional_dotenv import try_load_dotenv
+from examples._shared.paths import find_repo_root
 
 try_load_dotenv()
 

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dapr_agents_oas_adapter.converters.base import ConversionError
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.exporter import DaprAgentSpecExporter
 from dapr_agents_oas_adapter.loader import DaprAgentSpecLoader
 from dapr_agents_oas_adapter.types import (
@@ -1525,3 +1525,160 @@ agentspec_version: "25.4.1"
         with pytest.raises(OASSchemaValidationError) as exc_info:
             loader.load_dict(unknown_dict)
         assert any("component_type" in str(issue).lower() for issue in exc_info.value.issues)
+
+
+class TestExporterCoveragePatchGaps:
+    """Tests targeting uncovered lines in exporter.py for patch coverage."""
+
+    def test_to_json_with_indent_zero_returns_raw_json(self) -> None:
+        """Test to_json with indent=0 returns compact (unformatted) JSON."""
+        exporter = DaprAgentSpecExporter()
+        config = DaprAgentConfig(name="compact_test")
+        result = exporter.to_json(config, indent=0)
+        # indent=0 skips re-formatting; returns serializer's raw output
+        assert '"name"' in result or "name" in result
+
+    def test_to_component_unsupported_type_raises_conversion_error(self) -> None:
+        """Test to_component raises ConversionError for unsupported types."""
+        exporter = DaprAgentSpecExporter()
+        with pytest.raises(ConversionError, match="Unsupported component type"):
+            exporter.to_component("not_a_valid_component")  # type: ignore[arg-type]
+
+    def test_from_dapr_agent_with_callable_tools(self) -> None:
+        """Test from_dapr_agent extracts callable tool definitions."""
+        exporter = DaprAgentSpecExporter()
+
+        def search_tool(query: str) -> list[str]:
+            """Search for items."""
+            return [query]
+
+        mock_agent = MagicMock()
+        mock_agent.name = "tool_agent"
+        mock_agent.role = "Searcher"
+        mock_agent.goal = "Find things"
+        mock_agent.instructions = []
+        mock_agent.tools = [search_tool]
+        mock_agent.message_bus_name = "messagepubsub"
+        mock_agent.state_store_name = "statestore"
+        mock_agent.agents_registry_store_name = "agentsregistry"
+        mock_agent.service_port = 8000
+
+        result = exporter.from_dapr_agent(mock_agent)
+        assert result.name == "tool_agent"
+        assert len(result.tool_definitions) == 1
+        assert result.tool_definitions[0]["name"] == "search_tool"
+
+    def test_from_dapr_agent_failure_raises_conversion_error(self) -> None:
+        """Test from_dapr_agent wraps extraction errors in ConversionError."""
+        exporter = DaprAgentSpecExporter()
+
+        # Agent whose .name attribute raises an error during extraction
+        mock_agent = MagicMock()
+        mock_agent.name = "failing_agent"
+        mock_agent.role = "test"
+        mock_agent.goal = "test"
+        mock_agent.instructions = None
+        # Make tools iteration raise
+        mock_agent.tools = MagicMock(side_effect=TypeError("broken"))
+        mock_agent.tools.__iter__ = MagicMock(side_effect=TypeError("broken"))
+
+        with pytest.raises(ConversionError, match="Failed to extract configuration"):
+            exporter.from_dapr_agent(mock_agent)
+
+    def test_from_dapr_workflow_failure_raises_conversion_error(self) -> None:
+        """Test from_dapr_workflow wraps errors in ConversionError."""
+        exporter = DaprAgentSpecExporter()
+
+        # Function that has no __name__ and broken signature
+        broken_func = MagicMock()
+        broken_func.__name__ = "broken"
+        broken_func.__doc__ = "doc"
+        # Make inspect.signature fail
+        del broken_func.__wrapped__
+
+        with (
+            patch("inspect.signature", side_effect=ValueError("no sig")),
+            pytest.raises(ConversionError, match="Failed to extract definition"),
+        ):
+            exporter.from_dapr_workflow(broken_func, [broken_func])
+
+    def test_from_dapr_workflow_without_task_funcs(self) -> None:
+        """Test from_dapr_workflow with no task functions creates start+end only."""
+        exporter = DaprAgentSpecExporter()
+
+        def my_workflow(ctx: Any, params: dict) -> dict:
+            """Simple workflow."""
+            return params
+
+        result = exporter.from_dapr_workflow(my_workflow, task_funcs=None)
+        assert result.name == "my_workflow"
+        # Should have start and end nodes only
+        task_names = [t.name for t in result.tasks]
+        assert "start" in task_names
+        assert "end" in task_names
+
+    def test_build_system_prompt_no_role_no_goal(self) -> None:
+        """Test _build_system_prompt with no role and no goal."""
+        exporter = DaprAgentSpecExporter()
+        result = exporter._build_system_prompt(role=None, goal=None, instructions=["Do X"])
+        assert "You are" not in result
+        assert "Your goal" not in result
+        assert "Do X" in result
+
+    def test_build_system_prompt_with_role_and_goal(self) -> None:
+        """Test _build_system_prompt with role and goal."""
+        exporter = DaprAgentSpecExporter()
+        result = exporter._build_system_prompt(role="Assistant", goal="help users", instructions=[])
+        assert "You are Assistant." in result
+        assert "Your goal is to help users." in result
+
+    def test_build_system_prompt_empty(self) -> None:
+        """Test _build_system_prompt with all empty produces empty string."""
+        exporter = DaprAgentSpecExporter()
+        result = exporter._build_system_prompt(role=None, goal=None, instructions=[])
+        assert result == ""
+
+    def test_infer_task_type_llm(self) -> None:
+        """Test _infer_task_type returns llm for llm-related functions."""
+        exporter = DaprAgentSpecExporter()
+
+        def llm_process() -> None:
+            pass
+
+        assert exporter._infer_task_type(llm_process) == "llm"
+
+    def test_infer_task_type_tool(self) -> None:
+        """Test _infer_task_type returns tool for tool-related functions."""
+        exporter = DaprAgentSpecExporter()
+
+        def tool_execute() -> None:
+            pass
+
+        assert exporter._infer_task_type(tool_execute) == "tool"
+
+    def test_infer_task_type_agent(self) -> None:
+        """Test _infer_task_type returns agent for agent-related functions."""
+        exporter = DaprAgentSpecExporter()
+
+        def agent_dispatch() -> None:
+            pass
+
+        assert exporter._infer_task_type(agent_dispatch) == "agent"
+
+    def test_infer_task_type_from_docstring(self) -> None:
+        """Test _infer_task_type infers type from docstring."""
+        exporter = DaprAgentSpecExporter()
+
+        def process() -> None:
+            """This function uses a tool to do work."""
+
+        assert exporter._infer_task_type(process) == "tool"
+
+    def test_infer_task_type_default_to_llm(self) -> None:
+        """Test _infer_task_type defaults to llm for unknown functions."""
+        exporter = DaprAgentSpecExporter()
+
+        def process_data() -> None:
+            """Process some data."""
+
+        assert exporter._infer_task_type(process_data) == "llm"

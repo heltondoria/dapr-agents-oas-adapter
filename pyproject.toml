@@ -14,7 +14,6 @@ dependencies = [
     "dapr-agents>=0.10.5",
     "dapr>=1.16.0",
     "pydantic>=2.12.5",
-    "structlog>=24.1.0",
 ]
 
 [dependency-groups]
@@ -33,6 +32,7 @@ dev = [
     "ruff>=0.14.10",
     "ty>=0.0.9",
     "vulture>=2.14",
+    "xenon>=0.9",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -65,10 +65,33 @@ select = [
     "N",   # pep8-naming
     "S",   # flake8-bandit (security)
     "RUF", # Ruff rules
+    "ANN", # flake8-annotations
+    "PT",  # flake8-pytest-style
+    "ARG", # flake8-unused-arguments
+    "T20", # flake8-print
+    "RET", # flake8-return
+    "SLF", # flake8-self
+    "PIE", # flake8-pie
+    "PL",  # Pylint (PLC/PLE/PLR/PLW)
+    "TCH", # flake8-type-checking
+    "BLE", # flake8-blind-except
+]
+ignore = [
+    "PLR0913",  # too-many-arguments
+    "PLR2004",  # magic-value-comparison
+    "PLR0912",  # too-many-branches (converter methods are inherently branchy)
+    "PLR0915",  # too-many-statements
+    "PLR0911",  # too-many-return-statements
+    "PLC0415",  # import-outside-top-level (lazy imports to avoid circular deps)
+    "ANN401",   # any-type (too restrictive for adapter patterns)
+    "BLE001",   # blind-except (intentional for adapter error wrapping)
+    "PLW0603",  # global-statement (used in injectable logging)
+    "PLW2901",  # redefined-loop-name
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*" = ['S101']
+"tests/**/*.py" = ["S101", "ARG001", "ANN", "SLF001", "PLR0912", "PLR0915"]
+"examples/**/*.py" = ["T201", "ANN", "ARG001", "E402", "S101", "S603", "S607"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -87,12 +110,29 @@ pythonVersion = "3.12"
 typeCheckingMode = "standard"
 reportMissingImports = "information"
 reportMissingTypeStubs = "none"
+reportUnnecessaryTypeIgnoreComment = true
+reportDeprecated = true
 include = ["."]
-exclude = ["**/.venv/**", "**/tests/**"]
+exclude = ["**/.venv/**", "**/tests/**", "**/examples/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+]
 
 [tool.codespell]
 skip = ".git,.venv,.mypy_cache,uv.lock,htmlcov"

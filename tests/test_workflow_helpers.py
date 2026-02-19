@@ -471,11 +471,9 @@ class TestTaskExecutor:
         gen = executor.execute(ctx, task, {"input": "data"})
 
         # Generator should return the result
-        try:
+        with pytest.raises(StopIteration) as exc_info:
             next(gen)
-            pytest.fail("Generator should have returned directly")
-        except StopIteration as e:
-            assert e.value == {"custom": "result", "input": "data"}
+        assert exc_info.value.value == {"custom": "result", "input": "data"}
 
     def test_execute_activity_task(self) -> None:
         """Test execute calls activity for regular task."""

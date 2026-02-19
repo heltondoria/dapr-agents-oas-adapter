@@ -45,7 +45,7 @@ class StateSchemaBuilder:
 
         schema = StateSchemaBuilder.build_from_properties(properties)
         # Create TypedDict dynamically using the proper constructor
-        return TypedDict(name, schema)  # type: ignore[operator]
+        return TypedDict(name, schema)  # pyright: ignore[reportArgumentType]
 
     @staticmethod
     def extract_defaults(properties: list[PropertySchema]) -> dict[str, Any]:

@@ -10,12 +10,10 @@ from pyagentspec.tools import RemoteTool, ServerTool, Tool
 try:
     from pyagentspec.tools import MCPTool  # type: ignore[attr-defined]
 except ImportError:
-    MCPTool = None  # type: ignore[misc, assignment]
+    MCPTool = None
 
-from dapr_agents_oas_adapter.converters.base import (
-    ComponentConverter,
-    ConversionError,
-)
+from dapr_agents_oas_adapter.converters.base import ComponentConverter
+from dapr_agents_oas_adapter.exceptions import ConversionError
 from dapr_agents_oas_adapter.types import (
     PYTHON_TO_JSON_SCHEMA,
     NamedCallable,
@@ -161,12 +159,12 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         implementation = self._tool_registry.get(name)
 
         # Extract MCP transport config if this is an MCPTool
-        # Always set mcp_transport for MCPTool to preserve component type,
+        # Always set transport_config for MCPTool to preserve component type,
         # even if client_transport is empty
-        mcp_transport = None
+        transport_config = None
         if tool_dict.get("component_type") == "MCPTool":
             client_transport = tool_dict.get("client_transport", {})
-            mcp_transport = {
+            transport_config = {
                 "type": client_transport.get("component_type", "SSETransport"),
                 "url": client_transport.get("url"),
                 "headers": client_transport.get("headers"),
@@ -179,7 +177,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             inputs=tool_dict.get("inputs", []),
             outputs=tool_dict.get("outputs", []),
             implementation=implementation,
-            mcp_transport=mcp_transport,
+            transport_config=transport_config,
         )
 
     def to_dict(self, tool_def: ToolDefinition) -> dict[str, Any]:
@@ -192,8 +190,8 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             Dictionary representation of the tool
         """
         # Export as MCPTool if there's transport config
-        if tool_def.mcp_transport:
-            transport = tool_def.mcp_transport
+        if tool_def.transport_config:
+            transport = tool_def.transport_config
             client_transport: dict[str, Any] = {
                 "component_type": transport.get("type", "SSETransport"),
                 "id": generate_id("transport"),
@@ -352,7 +350,9 @@ class MCPToolConverter(ToolConverter):
         # Use 'is not None' to preserve MCPTool type even with empty transport
         transport = getattr(component, "client_transport", None)
         if transport is not None:
-            base_def.mcp_transport = self._extract_transport_config(transport)
+            base_def = base_def.model_copy(
+                update={"transport_config": self._extract_transport_config(transport)}
+            )
 
         return base_def
 
