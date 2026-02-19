@@ -121,6 +121,7 @@ exclude = ["**/.venv/**", "**/tests/**", "**/examples/**"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "-m 'not integration'"
 markers = [
     "integration: tests requiring a running Dapr sidecar (deselected by default)",
 ]

@@ -6,6 +6,7 @@ skipped when the sidecar is not available.
 
 from __future__ import annotations
 
+import functools
 import os
 from typing import Any
 
@@ -31,16 +32,23 @@ def _dapr_sidecar_available(retries: int = 3, interval: float = 2.0) -> bool:
             resp = httpx.get(f"http://localhost:{port}/v1.0/healthz", timeout=2.0)
             if resp.status_code == 204:
                 return True
-        except httpx.ConnectError:
+        except httpx.HTTPError:
             pass
         time.sleep(interval)
     return False
 
 
-requires_dapr = pytest.mark.skipif(
-    not _dapr_sidecar_available(),
-    reason="Dapr sidecar not available (set DAPR_HTTP_PORT or start daprd)",
-)
+@functools.cache
+def _check_sidecar() -> bool:
+    """Lazy singleton check — only probes the sidecar once per session."""
+    return _dapr_sidecar_available()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _require_dapr_sidecar() -> None:
+    """Skip all integration tests when the Dapr sidecar is unreachable."""
+    if not _check_sidecar():
+        pytest.skip("Dapr sidecar not available (set DAPR_HTTP_PORT or start daprd)")
 
 
 @pytest.fixture(scope="session")

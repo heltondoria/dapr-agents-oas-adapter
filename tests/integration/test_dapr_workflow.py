@@ -25,18 +25,12 @@ from dapr_agents_oas_adapter.types import (
     WorkflowTaskDefinition,
 )
 
-from .conftest import requires_dapr
 
-
-@requires_dapr
 @pytest.mark.integration
 class TestDaprWorkflowExecution:
     """Tests that require a real Dapr runtime."""
 
-    def test_linear_workflow_roundtrip_through_dapr(
-        self,
-        dapr_test_config: dict[str, Any],
-    ) -> None:
+    def test_linear_workflow_roundtrip_through_dapr(self) -> None:
         """OAS linear flow -> WorkflowDefinition -> OAS preserves structure."""
         flow_dict: dict[str, Any] = {
             "component_type": "Flow",
