@@ -16,6 +16,13 @@ dependencies = [
     "pydantic>=2.12.5",
 ]
 
+[project.urls]
+Homepage = "https://heltondoria.github.io/dapr-agents-oas-adapter/"
+Repository = "https://github.com/heltondoria/dapr-agents-oas-adapter"
+Documentation = "https://heltondoria.github.io/dapr-agents-oas-adapter/"
+Issues = "https://github.com/heltondoria/dapr-agents-oas-adapter/issues"
+Changelog = "https://github.com/heltondoria/dapr-agents-oas-adapter/releases"
+
 [dependency-groups]
 dev = [
     "codespell>=2.4.1",
