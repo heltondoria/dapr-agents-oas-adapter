@@ -3780,6 +3780,39 @@ class TestFlowConverter:
         result = converter._convert_edges(mock_flow)
         assert len(result) == 0
 
+    def test_convert_edges_merges_data_edge_into_existing_control_edge(self) -> None:
+        """Test _convert_edges merges data flow into matching control flow edge."""
+        converter = FlowConverter()
+
+        mock_flow = MagicMock()
+
+        mock_from = MagicMock()
+        mock_from.name = "nodeA"
+        mock_to = MagicMock()
+        mock_to.name = "nodeB"
+
+        # Control flow edge
+        mock_control_edge = MagicMock()
+        mock_control_edge.from_node = mock_from
+        mock_control_edge.to_node = mock_to
+        mock_control_edge.from_branch = None
+
+        # Data flow edge on same pair (uses source_node/destination_node)
+        mock_data_edge = MagicMock()
+        mock_data_edge.source_node = mock_from
+        mock_data_edge.destination_node = mock_to
+        mock_data_edge.source_output = "result"
+        mock_data_edge.destination_input = "input_text"
+
+        mock_flow.control_flow_connections = [mock_control_edge]
+        mock_flow.data_flow_connections = [mock_data_edge]
+
+        result = converter._convert_edges(mock_flow)
+        assert len(result) == 1
+        assert result[0].from_node == "nodeA"
+        assert result[0].to_node == "nodeB"
+        assert result[0].data_mapping == {"result": "input_text"}
+
 
 class TestConverterRegistry:
     """Tests for ConverterRegistry."""

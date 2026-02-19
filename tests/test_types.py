@@ -259,6 +259,27 @@ class TestPydanticFeatures:
         assert "provider" in field_names
         assert "model_name" in field_names
 
+    def test_llm_provider_config_accepts_url_alias(self) -> None:
+        """Verify LlmProviderConfig accepts legacy ``url`` key as ``base_url``."""
+        config = LlmProviderConfig(
+            provider="vllm",
+            model_name="llama-3",
+            url="http://localhost:8000",  # type: ignore[call-arg]
+        )
+        assert config.base_url == "http://localhost:8000"
+
+    def test_llm_provider_config_accepts_model_id_and_url_together(self) -> None:
+        """Verify both legacy aliases are accepted in a single call."""
+        config = LlmProviderConfig.model_validate(
+            {
+                "provider": "ollama",
+                "model_id": "llama2",
+                "url": "http://localhost:11434",
+            }
+        )
+        assert config.model_name == "llama2"
+        assert config.base_url == "http://localhost:11434"
+
     def test_tool_definition_model_json_schema(self) -> None:
         """Verify ToolDefinition generates valid JSON schema."""
         schema = ToolDefinition.model_json_schema()

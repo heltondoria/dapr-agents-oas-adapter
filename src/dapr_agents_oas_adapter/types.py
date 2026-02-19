@@ -80,9 +80,11 @@ class LlmProviderConfig(BaseModel):
         """Accept ``model_id`` as alias for ``model_name`` and ``url`` for ``base_url``."""
         if isinstance(data, dict):
             if "model_id" in data and "model_name" not in data:
-                data = {**data, "model_name": data.pop("model_id")}
+                data = {**data, "model_name": data["model_id"]}
+                del data["model_id"]
             if "url" in data and "base_url" not in data:
-                data = {**data, "base_url": data.pop("url")}
+                data = {**data, "base_url": data["url"]}
+                del data["url"]
         return data
 
     base_url: str | None = Field(default=None, description="Custom API endpoint URL")
