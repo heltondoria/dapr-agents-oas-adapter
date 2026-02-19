@@ -1,13 +1,8 @@
-# PRD - Dapr Agents OAS Adapter
+# PRD: dapr-agents-oas-adapter - Bidirectional OAS/Dapr Agents Interoperability
 
-## Document Information
-
-| Field | Value |
-|-------|-------|
-| Project Name | dapr-agents-oas-adapter |
-| Version | 1.1 |
-| Status | Draft |
-| Last Updated | 2025-01-28 |
+> **Status:** Planned
+> **Priority:** Standalone project (not part of DaprKit dependency tree)
+> **Depends on:** pyagentspec >= 25.4.1, dapr-agents >= 0.10.5
 
 ---
 
@@ -349,6 +344,51 @@ Generated IDs MUST:
 
 ### 3.3 Error Handling Rules
 
+#### Exception Hierarchy
+
+All exceptions inherit from a package-level base exception:
+
+```python
+class DaprAgentsOasAdapterError(Exception):
+    """Base exception for dapr-agents-oas-adapter."""
+
+
+class ConversionError(DaprAgentsOasAdapterError):
+    """Raised when OAS/Dapr conversion fails."""
+
+    def __init__(
+        self,
+        message: str,
+        component: Any = None,
+        suggestion: str | None = None,
+    ) -> None:
+        self.component = component
+        self.suggestion = suggestion
+
+        full_message = message
+        if component:
+            full_message += f"\nComponent: {component}"
+        if suggestion:
+            full_message += f"\nSuggestion: {suggestion}"
+        super().__init__(full_message)
+
+
+class ValidationError(DaprAgentsOasAdapterError):
+    """Raised when component validation fails."""
+
+    def __init__(
+        self,
+        message: str,
+        field_path: str | None = None,
+    ) -> None:
+        self.field_path = field_path
+
+        full_message = message
+        if field_path:
+            full_message += f"\nField: {field_path}"
+        super().__init__(full_message)
+```
+
 #### ER-001: ConversionError
 ```
 RAISE ConversionError when:
@@ -366,12 +406,34 @@ RAISE ValidationError when:
   - Invalid reference ($component_ref to non-existent component)
 ```
 
-#### ER-003: Error Context
+#### ER-003: Error Context and Chaining
 ```
-ALL errors MUST include:
-  - Descriptive message
-  - Component that caused error (when applicable)
-  - Suggested resolution (when possible)
+ALL errors MUST:
+  - Include descriptive message
+  - Include component that caused error (when applicable)
+  - Include suggested resolution (when possible)
+  - Chain original exception with `from e`
+```
+
+**Exception chaining example** — all error handling must preserve the original cause:
+
+```python
+try:
+    oas_component = deserialize(raw_data)
+except KeyError as e:
+    raise ConversionError(
+        f"Unknown node type: {raw_data.get('type', 'N/A')}",
+        component=raw_data,
+        suggestion="Supported node types: StartNode, EndNode, LlmNode, ToolNode, AgentNode, FlowNode, MapNode",
+    ) from e
+
+try:
+    validated = WorkflowValidator().validate(workflow_def)
+except ValueError as e:
+    raise ValidationError(
+        f"Invalid workflow structure: {e}",
+        field_path="workflow.nodes",
+    ) from e
 ```
 
 ---
@@ -659,6 +721,8 @@ ALL errors MUST include:
 
 > **Note on type checkers**: Both mypy and pyright are used because they have slightly different philosophies and can catch different edge cases. Astral's ty was considered but is still in beta (~15% conformance) and not recommended for CI gates requiring maximum accuracy. ty may be used optionally for fast local feedback during development.
 
+> **Tooling deviations from DaprKit standard:** This project's Ruff configuration is a **superset** of the standard DaprKit rule set (defined in `daprkit-specs/standards/TOOLING.md`). Additional rules include: ANN (type annotations), PT (pytest style), T20 (no print), RET (return consistency), SLF (private member access), PIE (misc lints), N (pep8-naming), BLE (blind except). These are stricter and fully compatible. Additionally, **pylint** is used exclusively for duplicate code detection (R0801) — this is project-specific and not part of the standard DaprKit toolchain.
+
 #### Ruff Rule Sets Explained
 
 ```toml
@@ -734,11 +798,340 @@ pylint --disable=all --enable=R0801 src/
 | dapr-agents | >= 0.10.5 |
 | dapr | >= 1.16.0 |
 
+### 5.6 Dependencies
+
+#### Runtime Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `pyagentspec` | >= 25.4.1 | OAS SDK — parsing and serialization of Open Agent Spec |
+| `dapr-agents` | >= 0.10.5 | Dapr Agents framework — agent/workflow runtime |
+| `pydantic` | >= 2.0 | Data validation and settings management |
+| `pyyaml` | >= 6.0 | YAML parsing for OAS specification files |
+
+#### Optional Dependencies
+
+| Group | Packages | Purpose |
+|-------|----------|---------|
+| `[logging]` | `structlog >= 24.0` | Structured logging for conversion operations |
+| `[validation]` | `jsonschema >= 4.0` | Strict JSON Schema validation mode (RF-010) |
+| `[testing]` | `hypothesis >= 6.0` | Property-based testing for roundtrip fidelity |
+
+#### Development Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `pytest >= 8.0` | Test runner |
+| `pytest-asyncio >= 0.23` | Async test support |
+| `pytest-cov >= 4.0` | Coverage enforcement (100%) |
+| `mypy >= 1.8` | Type checking (strict mode) |
+| `pyright >= 1.1` | Type checking (cross-validation) |
+| `ruff >= 0.2` | Linting and formatting |
+| `xenon >= 0.9` | Complexity gates (grade A) |
+| `vulture >= 2.11` | Dead code detection |
+| `radon >= 6.0` | Complexity metrics |
+| `pylint >= 3.0` | Duplicate code detection (R0801 only) |
+
+### 5.7 Async/Threading Strategy
+
+**Critical:** The Dapr Python SDK has synchronous operations. Using `asyncio.to_thread()` naively can cause issues with libraries that have their own thread-local state (e.g., SQLAlchemy sessions).
+
+**Known issues:**
+- Dapr client operations in `to_thread()` may not preserve async context
+- Cache decorators on functions using thread-sensitive libraries may have thread context problems
+
+**Required approach:**
+- Test with thread-sensitive libraries when integrating with downstream code
+- Consider alternatives to `to_thread()` where appropriate:
+  - Native async Dapr operations (when available)
+  - Proper context propagation
+  - Task-based isolation
+
+**Design principle:** All I/O must be async. The sync API is a convenience wrapper around the async core.
+
+| Operation | Strategy | Rationale |
+|-----------|----------|-----------|
+| File I/O (YAML/JSON loading) | `asyncio.to_thread(path.read_text)` | File reads are blocking I/O |
+| pyagentspec deserialization | Sync (no wrapping) | CPU-bound, no I/O; runs in microseconds |
+| Dapr agent creation | `asyncio.to_thread(dapr_sdk_call)` | Dapr Python SDK is synchronous |
+| MCP tool connections | Async-native via MCP client | MCP protocol is natively async |
+| Pydantic validation | Sync (no wrapping) | CPU-bound, no I/O |
+
+#### Thread Safety
+
+Converter classes (`AgentConverter`, `FlowConverter`, etc.) are **stateless** and safe to share across async contexts. The `IDGenerator` uses an internal counter and must be instantiated per-conversion session or protected with `asyncio.Lock` when shared.
+
+```python
+import asyncio
+from pathlib import Path
+
+class AsyncDaprAgentSpecLoader:
+    """Async-first loader for OAS specifications.
+
+    Args:
+        tool_registry: Mapping of tool names to implementations.
+    """
+
+    async def load_yaml_file(self, path: Path) -> DaprAgentConfig | WorkflowDefinition:
+        """Load and parse an OAS YAML file.
+
+        Args:
+            path: Path to the OAS YAML specification file.
+
+        Returns:
+            Parsed configuration (agent or workflow).
+
+        Raises:
+            ConversionError: If the file cannot be parsed or converted.
+        """
+        content = await asyncio.to_thread(path.read_text)
+        return self.load_yaml(content)
+
+    async def create_agent(self, config: DaprAgentConfig, **kwargs: Any) -> Any:
+        """Create a Dapr agent from configuration.
+
+        Wraps the synchronous dapr-agents SDK with asyncio.to_thread().
+        """
+        return await asyncio.to_thread(self._create_agent_sync, config, **kwargs)
+
+
+# Sync wrapper for convenience
+class DaprAgentSpecLoader:
+    """Synchronous wrapper around AsyncDaprAgentSpecLoader."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        self._async = AsyncDaprAgentSpecLoader(**kwargs)
+
+    def load_yaml_file(self, path: Path) -> DaprAgentConfig | WorkflowDefinition:
+        return asyncio.run(self._async.load_yaml_file(path))
+```
+
+### 5.8 Test Strategy
+
+#### Test Naming Convention
+
+Tests follow the `test_<function>_<scenario>_<expected_result>` pattern:
+
+```python
+# Agent conversion
+def test_from_oas_agent_with_tools_returns_react_agent(): ...
+def test_from_oas_agent_with_durable_keys_returns_durable_agent(): ...
+def test_from_oas_agent_explicit_type_overrides_inference(): ...
+
+# Workflow conversion
+def test_from_oas_flow_linear_returns_sequential_workflow(): ...
+def test_from_oas_flow_circular_reference_raises_conversion_error(): ...
+def test_from_oas_flow_with_subflows_registers_children_first(): ...
+
+# Tool resolution
+def test_resolve_tool_registered_returns_implementation(): ...
+def test_resolve_tool_mcp_creates_client_with_transport(): ...
+def test_resolve_tool_missing_raises_conversion_error(): ...
+
+# LLM provider mapping
+def test_map_llm_openai_config_returns_openai_client(): ...
+def test_map_llm_unknown_provider_defaults_to_openai_compatible(): ...
+
+# Roundtrip fidelity
+def test_roundtrip_agent_config_preserves_all_fields(): ...
+def test_roundtrip_workflow_definition_preserves_all_fields(): ...
+```
+
+#### Key Test Scenarios
+
+| Category | Scenarios | Coverage Target |
+|----------|-----------|----------------|
+| **Agent conversion** | AssistantAgent, ReActAgent, DurableAgent (3 types) | 100% |
+| **Workflow conversion** | Linear, branching, map/fan-out, compensation | 100% |
+| **Tool resolution** | ServerTool, MCPTool, missing tool | 100% |
+| **LLM provider mapping** | OpenAI, vLLM, Ollama, OCI GenAI, unknown | 100% |
+| **Roundtrip fidelity** | Agent config, workflow definition, edge cases | 100% |
+| **Error handling** | Invalid YAML, missing fields, circular refs, type mismatches | 100% |
+| **Validation** | Orphan nodes, missing start, duplicate edges, invalid refs | 100% |
+
+#### Test Organization
+
+```
+tests/
+├── conftest.py                    # Shared fixtures, seeded IDGenerator
+├── fixtures/
+│   ├── simple_agent.yaml          # Basic OAS agent spec
+│   ├── react_agent_with_tools.yaml
+│   ├── durable_agent.yaml
+│   ├── simple_flow.yaml           # Linear workflow
+│   ├── branching_flow.yaml        # Conditional branching
+│   ├── map_flow.yaml              # Fan-out pattern
+│   └── compensation_flow.yaml     # Saga pattern
+├── test_agent_converter.py
+├── test_flow_converter.py
+├── test_tool_converter.py
+├── test_llm_converter.py
+├── test_loader.py
+├── test_exporter.py
+├── test_validator.py
+├── test_models.py
+├── test_roundtrip.py              # Roundtrip fidelity tests
+├── property/
+│   └── test_roundtrip_properties.py  # Hypothesis property-based tests
+└── integration/
+    ├── conftest.py                # Dapr test container setup
+    └── test_dapr_workflow.py      # Real Dapr runtime tests
+```
+
 ---
 
-## 6. Technical Architecture
+## 6. API Surface
 
-### 6.1 Component Diagram
+### 6.1 OAS Agent YAML Input Example
+
+```yaml
+# simple_agent.yaml — Example OAS specification for a ReAct agent
+apiVersion: agent-spec/v1
+kind: Agent
+metadata:
+  name: research-assistant
+  annotations:
+    dapr_agent_type: ReActAgent
+spec:
+  description: "AI research assistant with web search capabilities"
+  system_prompt: |
+    You are a research assistant. Use available tools to find
+    accurate information and provide well-sourced answers.
+  llm_config:
+    type: OpenAIConfig
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 4096
+  tools:
+    - name: web_search
+      type: ServerTool
+      description: "Search the web for information"
+      inputs:
+        - name: query
+          type: string
+          description: "Search query"
+      outputs:
+        - name: results
+          type: string
+          description: "Search results"
+    - name: code_interpreter
+      type: MCPTool
+      description: "Execute code snippets"
+      client_transport:
+        type: sse
+        url: "http://localhost:8080/mcp"
+  inputs:
+    - name: question
+      type: string
+      description: "User question"
+  outputs:
+    - name: answer
+      type: string
+      description: "Agent response"
+```
+
+### 6.2 Complete Usage Examples
+
+#### Importing an OAS Agent
+
+```python
+from pathlib import Path
+
+from dapr_agents_oas_adapter import DaprAgentSpecLoader
+
+# Create loader with tool registry
+loader = DaprAgentSpecLoader(
+    tool_registry={"web_search": web_search_fn},
+)
+
+# Load OAS YAML and parse into config
+config = loader.load_yaml_file(Path("simple_agent.yaml"))
+print(config.name)        # "research-assistant"
+print(config.agent_type)  # "ReActAgent"
+
+# Create executable Dapr agent from config
+agent = loader.create_agent(config)
+
+# Agent is now ready to receive messages
+response = agent.run("What is the capital of France?")
+```
+
+#### Exporting a Dapr Agent to OAS
+
+```python
+from dapr_agents_oas_adapter import DaprAgentSpecExporter
+
+exporter = DaprAgentSpecExporter()
+
+# Export from a running Dapr agent instance
+oas_config = exporter.from_dapr_agent(agent)
+
+# Serialize to YAML file
+exporter.to_yaml_file(oas_config, Path("exported_agent.yaml"))
+
+# Or get YAML string
+yaml_str = exporter.to_yaml(oas_config)
+```
+
+#### Workflow Conversion
+
+```python
+from dapr_agents_oas_adapter import DaprAgentSpecLoader
+
+loader = DaprAgentSpecLoader()
+
+# Load OAS Flow and convert to Dapr workflow
+workflow_def = loader.load_yaml_file(Path("branching_flow.yaml"))
+workflow_fn = loader.create_workflow(
+    workflow_def,
+    task_implementations={"classify": classify_fn, "process": process_fn},
+)
+
+# Register and execute with Dapr workflow runtime
+from dapr.ext.workflow import WorkflowRuntime
+
+runtime = WorkflowRuntime()
+runtime.register_workflow(workflow_fn)
+runtime.start()
+
+result = runtime.run_workflow(workflow_fn.__name__, input={"data": "test"})
+```
+
+#### Async Usage
+
+```python
+import asyncio
+from pathlib import Path
+
+from dapr_agents_oas_adapter import AsyncDaprAgentSpecLoader
+
+async def main() -> None:
+    loader = AsyncDaprAgentSpecLoader(
+        tool_registry={"web_search": web_search_fn},
+    )
+    config = await loader.load_yaml_file(Path("simple_agent.yaml"))
+    agent = await loader.create_agent(config)
+
+asyncio.run(main())
+```
+
+### 6.3 Public API Summary
+
+| Class | Purpose | Key Methods |
+|-------|---------|-------------|
+| `DaprAgentSpecLoader` | Sync loader for OAS specs | `load_yaml_file()`, `load_yaml()`, `load_dict()`, `create_agent()`, `create_workflow()` |
+| `AsyncDaprAgentSpecLoader` | Async loader for OAS specs | Same as above, all async |
+| `DaprAgentSpecExporter` | Export Dapr agents to OAS | `from_dapr_agent()`, `from_dapr_workflow()`, `to_yaml()`, `to_yaml_file()`, `to_dict()` |
+| `DaprAgentConfig` | Agent configuration model | Pydantic model with `frozen=True` |
+| `WorkflowDefinition` | Workflow configuration model | Pydantic model with `frozen=True` |
+| `ConversionError` | Conversion failure | Includes component context and suggestion |
+| `ValidationError` | Validation failure | Includes field path information |
+
+---
+
+## 7. Technical Architecture
+
+### 7.1 Component Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -777,67 +1170,155 @@ pylint --disable=all --enable=R0801 src/
 └─────────────────┘              └─────────────────┘
 ```
 
-### 6.2 Data Models
+### 7.2 Data Models
+
+> **Convention:** All data models use Pydantic v2 with `frozen=True` and `Field()` descriptions per DaprKit standards. Workflow types that currently use dataclasses will be migrated to Pydantic in RF-002.
+
+#### LlmProviderConfig
+
+```python
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class LlmProviderConfig(BaseModel):
+    """LLM provider configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: str = Field(description="Provider identifier: openai, vllm, ollama, oci")
+    model_name: str = Field(description="Model name or deployment identifier")
+    api_key: str | None = Field(default=None, description="API key (masked in logs)")
+    base_url: str | None = Field(default=None, description="Custom API endpoint URL")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    max_tokens: int | None = Field(default=None, ge=1, description="Maximum tokens in response")
+```
+
+#### Environment Variable Resolution
+
+When `api_key` or `base_url` are `None` in the OAS specification, the adapter delegates credential resolution to the underlying LLM client libraries at agent creation time (not at spec loading time):
+
+| Provider | Environment Variable | Default |
+|----------|---------------------|---------|
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | Required |
+| vLLM | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | Uses OpenAI-compatible client |
+| Ollama | `OLLAMA_HOST` | `http://localhost:11434` |
+| OCI GenAI | `OCI_CONFIG_FILE` | `~/.oci/config` |
+
+This ensures sensitive credentials never appear in OAS YAML files:
+
+```yaml
+# OAS spec — no API key, resolved from environment
+llm_config:
+  type: OpenAIConfig
+  model: gpt-4o
+  temperature: 0.7
+  # api_key omitted → resolved from OPENAI_API_KEY at runtime
+```
+
+```python
+from pathlib import Path
+
+from dapr_agents_oas_adapter import DaprAgentSpecLoader
+
+loader = DaprAgentSpecLoader(tool_registry={"web_search": web_search_fn})
+
+# Spec loading does NOT require API key — it's a pure data transformation
+config = loader.load_yaml_file(Path("agent.yaml"))
+assert config.llm_config.api_key is None  # Not in spec
+
+# Agent creation resolves credentials from environment via the LLM client
+agent = loader.create_agent(config)
+# Underlying OpenAIChatClient reads OPENAI_API_KEY from os.environ
+```
+
+#### ToolDefinition
+
+```python
+class ToolDefinition(BaseModel):
+    """Tool definition extracted from OAS specification."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(description="Tool function name")
+    description: str = Field(default="", description="Human-readable tool description")
+    tool_type: str = Field(description="Tool type: server, mcp")
+    input_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for tool inputs")
+    output_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for tool outputs")
+    transport_config: dict[str, str] | None = Field(default=None, description="MCP transport configuration")
+```
 
 #### DaprAgentConfig
+
 ```python
 class DaprAgentConfig(BaseModel):
+    """Configuration for a Dapr agent derived from OAS specification."""
+
+    model_config = ConfigDict(frozen=True)
+
     # Identity
-    name: str                              # Unique agent identifier
-    role: str | None                       # Agent persona
-    goal: str | None                       # Agent objective
+    name: str = Field(description="Unique agent identifier")
+    role: str | None = Field(default=None, description="Agent persona or role description")
+    goal: str | None = Field(default=None, description="Agent objective or mission")
 
     # Behavior
-    instructions: list[str]                # Behavioral guidelines
-    system_prompt: str | None              # Raw prompt template
-    tools: list[str]                       # Tool names to bind
-    input_variables: list[str]             # Template placeholders
+    instructions: list[str] = Field(default_factory=list, description="Behavioral guidelines")
+    system_prompt: str | None = Field(default=None, description="Raw prompt template")
+    tools: list[str] = Field(default_factory=list, description="Tool names to bind")
+    input_variables: list[str] = Field(default_factory=list, description="Template placeholders")
 
     # Infrastructure
-    message_bus_name: str = "messagepubsub"
-    state_store_name: str = "statestore"
-    agents_registry_store_name: str = "agentsregistry"
-    service_port: int = 8000
+    message_bus_name: str = Field(default="messagepubsub", description="Dapr pub/sub component name")
+    state_store_name: str = Field(default="statestore", description="Dapr state store component name")
+    agents_registry_store_name: str = Field(default="agentsregistry", description="Agents registry store name")
+    service_port: int = Field(default=8000, ge=1, le=65535, description="Service listening port")
 
     # Type
-    agent_type: str | None                 # AssistantAgent|ReActAgent|DurableAgent
-    llm_config: dict[str, Any] | None
-    tool_definitions: list[dict[str, Any]]
+    agent_type: str | None = Field(default=None, description="Agent type: AssistantAgent, ReActAgent, or DurableAgent")
+    llm_config: LlmProviderConfig | None = Field(default=None, description="LLM provider configuration")
+    tool_definitions: list[ToolDefinition] = Field(default_factory=list, description="Tool definitions from OAS spec")
 
     # DurableAgent-specific
-    agent_topic: str | None
-    broadcast_topic: str | None
-    state_key_prefix: str | None
-    memory_store_name: str | None
-    memory_session_id: str | None
-    registry_team_name: str | None
+    agent_topic: str | None = Field(default=None, description="Topic for agent-to-agent messaging")
+    broadcast_topic: str | None = Field(default=None, description="Topic for broadcast messages")
+    state_key_prefix: str | None = Field(default=None, description="Prefix for state store keys")
+    memory_store_name: str | None = Field(default=None, description="State store for agent memory")
+    memory_session_id: str | None = Field(default=None, description="Session ID for memory scoping")
+    registry_team_name: str | None = Field(default=None, description="Team name for agent registry")
 ```
 
 #### WorkflowDefinition
+
 ```python
-@dataclass
-class WorkflowDefinition:
-    name: str                                    # Workflow identifier
-    description: str | None                      # Human description
-    flow_id: str | None                          # OAS component ID
-    tasks: list[WorkflowTaskDefinition]          # Nodes
-    edges: list[WorkflowEdgeDefinition]          # Connections
-    start_node: str | None                       # Entry point
-    end_nodes: list[str]                         # Exit points
-    inputs: list[PropertySchema]                 # Input schema
-    outputs: list[PropertySchema]                # Output schema
-    subflows: dict[str, WorkflowDefinition]      # Nested flows
+class WorkflowDefinition(BaseModel):
+    """Workflow definition converted from OAS Flow specification."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(description="Workflow identifier")
+    description: str | None = Field(default=None, description="Human-readable description")
+    flow_id: str | None = Field(default=None, description="OAS component ID")
+    tasks: list[WorkflowTaskDefinition] = Field(default_factory=list, description="Workflow task nodes")
+    edges: list[WorkflowEdgeDefinition] = Field(default_factory=list, description="Connections between tasks")
+    start_node: str | None = Field(default=None, description="Entry point task name")
+    end_nodes: list[str] = Field(default_factory=list, description="Exit point task names")
+    inputs: list[PropertySchema] = Field(default_factory=list, description="Input schema")
+    outputs: list[PropertySchema] = Field(default_factory=list, description="Output schema")
+    subflows: dict[str, WorkflowDefinition] = Field(default_factory=dict, description="Nested sub-workflow definitions")
 ```
 
 #### WorkflowTaskDefinition
+
 ```python
-@dataclass
-class WorkflowTaskDefinition:
-    name: str                                    # Task identifier
-    task_type: str                               # start|end|llm|tool|agent|flow|map
-    config: dict[str, Any]                       # Type-specific config
-    inputs: list[str]                            # Input field names
-    outputs: list[str]                           # Output field names
+class WorkflowTaskDefinition(BaseModel):
+    """Individual task node within a workflow."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(description="Task identifier")
+    task_type: str = Field(description="Node type: start, end, llm, tool, agent, flow, map")
+    config: dict[str, Any] = Field(default_factory=dict, description="Type-specific configuration")
+    inputs: list[str] = Field(default_factory=list, description="Input field names")
+    outputs: list[str] = Field(default_factory=list, description="Output field names")
 
     # Config keys by type:
     # llm: prompt_template, llm_config
@@ -848,17 +1329,21 @@ class WorkflowTaskDefinition:
 ```
 
 #### WorkflowEdgeDefinition
+
 ```python
-@dataclass
-class WorkflowEdgeDefinition:
-    from_node: str                               # Source task name
-    to_node: str                                 # Target task name
-    from_branch: str | None                      # Conditional branch value
-    condition: str | None                        # Future: expression
-    data_mapping: dict[str, str]                 # output_key → input_key
+class WorkflowEdgeDefinition(BaseModel):
+    """Connection between two workflow tasks."""
+
+    model_config = ConfigDict(frozen=True)
+
+    from_node: str = Field(description="Source task name")
+    to_node: str = Field(description="Target task name")
+    from_branch: str | None = Field(default=None, description="Conditional branch value for routing")
+    condition: str | None = Field(default=None, description="Future: expression-based condition")
+    data_mapping: dict[str, str] = Field(default_factory=dict, description="Output key to input key mapping")
 ```
 
-### 6.3 Conversion Flow
+### 7.3 Conversion Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -903,11 +1388,11 @@ class WorkflowEdgeDefinition:
 
 ---
 
-## 7. Refactoring Roadmap
+## 8. Refactoring Roadmap
 
 > **Development Methodology**: This project will be developed using the **ralph-loop** technique with AI assistance. The roadmap is organized by **logical dependencies** between items, not by sprints or time estimates. Each refactoring item must be completed with 100% test coverage before proceeding.
 
-### 7.1 Phase 1: Foundation Cleanup
+### 8.1 Phase 1: Foundation Cleanup
 
 #### RF-001: Fix Version Inconsistency
 **Current State:** `__init__.py` has "0.4.1", `pyproject.toml` has "0.6.0"
@@ -961,7 +1446,7 @@ class IDGenerator:
 - [ ] No seed produces unique IDs
 - [ ] Tests use seeded generator
 
-### 7.2 Phase 2: Code Quality
+### 8.2 Phase 2: Code Quality
 
 #### RF-004: Decompose FlowConverter.create_dapr_workflow()
 **Current State:** ~350 lines with 15+ nested functions
@@ -1031,60 +1516,79 @@ class WorkflowValidator:
 **Current State:** Generic error messages
 **Target State:** Actionable error messages with context
 
-**Implementation:**
+**Implementation** (uses exception hierarchy from section 3.3):
 ```python
-class ConversionError(Exception):
-    def __init__(
-        self,
-        message: str,
-        component: Any = None,
-        suggestion: str | None = None,
-        caused_by: Exception | None = None,
-    ):
-        self.component = component
-        self.suggestion = suggestion
-        self.caused_by = caused_by
+# ConversionError is defined in section 3.3 with component + suggestion support.
+# All raise sites must use standard Python exception chaining (`from e`):
 
-        full_message = message
-        if component:
-            full_message += f"\nComponent: {self._describe(component)}"
-        if suggestion:
-            full_message += f"\nSuggestion: {suggestion}"
-        super().__init__(full_message)
+try:
+    dapr_config = agent_converter.from_oas(oas_agent)
+except KeyError as e:
+    raise ConversionError(
+        f"Missing required field in agent spec: {e}",
+        component=oas_agent,
+        suggestion="Ensure the OAS agent has all required fields (name, llm_config)",
+    ) from e  # <-- Always chain with `from e`
+
+try:
+    workflow_fn = flow_converter.create_dapr_workflow(workflow_def)
+except RecursionError as e:
+    raise ConversionError(
+        "Circular reference detected in workflow subflows",
+        component=workflow_def,
+        suggestion="Check for cyclic $referenced_components in the OAS Flow",
+    ) from e
 ```
 
 **Acceptance Criteria:**
 - [ ] All errors include component context when applicable
 - [ ] Errors suggest resolution when possible
-- [ ] Original exceptions are chained
+- [ ] All `raise` statements use `from e` for exception chaining
+- [ ] No custom `caused_by` parameter — use standard Python `__cause__`
 
-### 7.3 Phase 3: Enterprise Features
+### 8.3 Phase 3: Enterprise Features
 
 #### RF-007: Add Observability
 **Current State:** No logging or metrics
 **Target State:** Structured logging and optional metrics
 
-**Implementation:**
+**Implementation** (standard `logging` interface per DaprKit CONVENTIONS.md):
 ```python
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 class FlowConverter:
-    def from_oas(self, component):
-        logger.info("converting_flow", flow_id=component.id, name=component.name)
+    """Converts OAS Flow specifications to Dapr workflow definitions."""
+
+    def from_oas(self, component: Any) -> WorkflowDefinition:
+        """Convert an OAS Flow component to a WorkflowDefinition.
+
+        Args:
+            component: OAS Flow component from pyagentspec.
+
+        Returns:
+            Converted workflow definition.
+
+        Raises:
+            ConversionError: If the flow cannot be converted.
+        """
+        logger.info("converting_flow", extra={"flow_id": component.id, "name": component.name})
         try:
             result = self._convert(component)
-            logger.info("flow_converted", tasks=len(result.tasks))
+            logger.info("flow_converted", extra={"tasks": len(result.tasks)})
             return result
         except Exception as e:
-            logger.error("conversion_failed", error=str(e), flow_id=component.id)
+            logger.error("conversion_failed", extra={"error": str(e), "flow_id": component.id})
             raise
 ```
+
+> **Note:** If the project opts for `structlog` instead of standard `logging`, this is a deliberate deviation from DaprKit convention and should be installed via the `[logging]` optional dependency group. The standard `logging.getLogger(__name__)` with `extra={}` kwargs is the default convention.
 
 **Acceptance Criteria:**
 - [ ] All conversions logged at INFO level
 - [ ] Errors logged at ERROR level with context
+- [ ] Uses `logging.getLogger(__name__)` with `extra={}` kwargs (or documents structlog as explicit deviation)
 - [ ] Optional metrics export (Prometheus/OpenTelemetry)
 
 #### RF-008: Add Caching Layer
@@ -1116,30 +1620,13 @@ class CachedLoader(DaprAgentSpecLoader):
 **Current State:** Synchronous only
 **Target State:** Async-first with sync wrapper
 
-**Implementation:**
-```python
-class AsyncDaprAgentSpecLoader:
-    async def load_yaml_file(self, path: Path) -> DaprAgentConfig | WorkflowDefinition:
-        content = await asyncio.to_thread(path.read_text)
-        return await self.load_yaml(content)
-
-    async def create_agent(self, config: DaprAgentConfig) -> Any:
-        # Async agent initialization
-        pass
-
-# Sync wrapper
-class DaprAgentSpecLoader:
-    def __init__(self):
-        self._async = AsyncDaprAgentSpecLoader()
-
-    def load_yaml_file(self, path: Path):
-        return asyncio.run(self._async.load_yaml_file(path))
-```
+> See section 5.7 (Async/Threading Strategy) for the design approach, per-operation strategy table, and implementation examples.
 
 **Acceptance Criteria:**
 - [ ] All I/O operations have async variants
 - [ ] Sync API unchanged (backwards compatible)
 - [ ] Async operations run concurrently when possible
+- [ ] Thread safety documented for shared converter instances
 
 #### RF-010: Add Schema Validation Mode
 **Current State:** Trusts input structure
@@ -1163,7 +1650,7 @@ class StrictLoader(DaprAgentSpecLoader):
 - [ ] Schema errors include JSON path
 - [ ] Schema version is configurable
 
-### 7.4 Phase 4: Testing & Documentation
+### 8.4 Phase 4: Testing & Documentation
 
 #### RF-011: Add Property-Based Testing
 **Current State:** Example-based tests only
@@ -1238,9 +1725,9 @@ def test_workflow_executes_in_dapr(dapr_runtime):
 
 ---
 
-## 8. Development Strategy
+## 9. Development Strategy
 
-### 8.1 Methodology: Ralph-Loop with AI Assistance
+### 9.1 Methodology: Ralph-Loop with AI Assistance
 
 This project will be developed using the **ralph-loop** technique - iterative AI-assisted development cycles where each iteration:
 
@@ -1250,7 +1737,7 @@ This project will be developed using the **ralph-loop** technique - iterative AI
 4. **Validates** against quality gates
 5. **Iterates** until approval on all gates
 
-### 8.2 Dependency Graph
+### 9.2 Dependency Graph
 
 Refactoring items have the following dependencies:
 
@@ -1278,7 +1765,7 @@ RF-012 (Integration Tests) ◄── Requires: RF-004, RF-009
 RF-013 (Documentation) ◄── Requires: All above
 ```
 
-### 8.3 Quality Gate Checklist (Per Item)
+### 9.3 Quality Gate Checklist (Per Item)
 
 Each refactoring item is only complete when:
 
@@ -1295,7 +1782,7 @@ Each refactoring item is only complete when:
 - [ ] xenon: Grade A on all modules
 - [ ] Documentation updated
 
-### 8.4 Validation Strategy
+### 9.4 Validation Strategy
 
 The project will be validated on real projects before upstream contribution:
 
@@ -1330,7 +1817,7 @@ The project will be validated on real projects before upstream contribution:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.5 Upstream Contribution Path
+### 9.5 Upstream Contribution Path
 
 The Dapr Agents team has shown openness to analyzing potential OAS support in an initial contact. The strategy is:
 
@@ -1344,7 +1831,7 @@ The Dapr Agents team has shown openness to analyzing potential OAS support in an
 
 ---
 
-## 9. Risk Assessment
+## 10. Risk Assessment
 
 ### Technical Risks
 
@@ -1380,7 +1867,7 @@ The Dapr Agents team has shown openness to analyzing potential OAS support in an
 
 ---
 
-## 10. Appendix
+## 11. Appendix
 
 ### A. Glossary
 
@@ -1407,3 +1894,6 @@ The Dapr Agents team has shown openness to analyzing potential OAS support in an
 |---------|------|---------|
 | 1.0 | 2025-01-28 | Initial PRD creation |
 | 1.1 | 2025-01-28 | Added Market Analysis section; Updated Python requirement to 3.10+; All features marked P0; Removed sprint-based roadmap in favor of ralph-loop methodology; Enhanced quality gates (100% coverage, comprehensive static analysis); Added upstream contribution strategy; Translated to English |
+| 1.2 | 2026-02-17 | DaprKit spec review compliance: standardized header format (Status/Priority/Depends blockquotes); added API Surface section with YAML fixture and full usage examples; added Async/Threading Strategy section referencing PRD-daprkit.md 5.6; defined exception hierarchy with base class and `from e` chaining; added `frozen=True` and `Field()` descriptions to all Pydantic models; replaced `dict[str, Any]` with typed `LlmProviderConfig` and `ToolDefinition` models; added consolidated Dependencies section with optional groups; added dedicated Test Strategy section with naming conventions and key scenarios; fixed logging examples to use standard `logging.getLogger(__name__)` interface; documented tooling deviations from DaprKit standard; added optional DaprKit integration note; renumbered sections for new API Surface (6) and Test Strategy (5.8) |
+| 1.3 | 2026-02-17 | Added Environment Variable Resolution subsection documenting LLM credential resolution via provider-specific env vars; removed Related PRDs header reference and Optional DaprKit Integration subsection (standalone project with no daprkit dependency); inlined async/threading concerns previously referenced from external PRD |
+| 1.4 | 2026-02-17 | Spec review fixes: added `field_path` attribute to `ValidationError` to match Public API Summary description; added `pylint >= 3.0` to Development Dependencies table |

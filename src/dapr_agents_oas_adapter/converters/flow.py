@@ -183,7 +183,7 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
         self, flow_dict: dict[str, Any], *, _visited_flows: set[str] | None = None
     ) -> WorkflowDefinition:
         """Convert a dictionary representation to WorkflowDefinition."""
-        visited_flows = _visited_flows or set()
+        visited_flows = _visited_flows if _visited_flows is not None else set()
         flow_id = flow_dict.get("id")
         if flow_id:
             if flow_id in visited_flows:
@@ -645,9 +645,14 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
             )
 
             if matching:
-                matching.data_mapping[getattr(data_edge, "source_output", "")] = getattr(
-                    data_edge, "destination_input", ""
-                )
+                updated_mapping = {
+                    **matching.data_mapping,
+                    getattr(data_edge, "source_output", ""): getattr(
+                        data_edge, "destination_input", ""
+                    ),
+                }
+                idx = edges.index(matching)
+                edges[idx] = matching.model_copy(update={"data_mapping": updated_mapping})
             else:
                 edges.append(
                     WorkflowEdgeDefinition(

@@ -183,9 +183,9 @@ class DaprAgentConfig(BaseModel):
     service_port: int = Field(default=8000, description="Service listening port")
     # Additional fields for type safety
     agent_type: str | None = Field(default=None, description="Agent class type name")
-    llm_config: dict[str, Any] | None = Field(default=None, description="LLM client configuration")
-    tool_definitions: list[dict[str, Any]] = Field(
-        default_factory=list, description="Tool definition dictionaries"
+    llm_config: LlmClientConfig | None = Field(default=None, description="LLM client configuration")
+    tool_definitions: list[ToolDefinition] = Field(
+        default_factory=list, description="Tool definitions"
     )
     input_variables: list[str] = Field(default_factory=list, description="Input variable names")
     # DurableAgent-specific configuration fields

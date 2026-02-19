@@ -38,12 +38,10 @@ Complete API documentation for `dapr-agents-oas-adapter`.
 
 ### Logging
 
-| Function/Class | Description |
-|----------------|-------------|
-| [`get_logger`](logging.md#get_logger) | Get a structured logger |
-| [`configure_logging`](logging.md#configure_logging) | Configure log level |
-| [`log_operation`](logging.md#log_operation) | Decorator for operation logging |
-| [`LoggingMixin`](logging.md#loggingmixin) | Mixin for class logging |
+| Function | Description |
+|----------|-------------|
+| [`get_logger`](logging.md#get_logger) | Get the current logger instance |
+| [`set_logger`](logging.md#set_logger) | Inject a custom logger |
 
 ### Types
 
@@ -99,14 +97,8 @@ from dapr_agents_oas_adapter import (
     InMemoryCache,
 
     # Logging
-    LoggingMixin,
-    bind_context,
-    clear_context,
-    configure_logging,
     get_logger,
-    log_context,
-    log_operation,
-    unbind_context,
+    set_logger,
 
     # Utilities
     IDGenerator,

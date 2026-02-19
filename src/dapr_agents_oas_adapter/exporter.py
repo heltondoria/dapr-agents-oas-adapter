@@ -220,12 +220,11 @@ class DaprAgentSpecExporter:
             tools = getattr(agent, "tools", [])
             tool_names = [getattr(t, "__name__", str(t)) if callable(t) else str(t) for t in tools]
 
-            # Extract tool definitions
+            # Extract tool definitions as typed ToolDefinition objects
             tool_definitions = []
             for tool in tools:
                 if callable(tool):
-                    tool_def = self._tool_converter.from_callable(tool)
-                    tool_definitions.append(self._tool_converter.to_dict(tool_def))
+                    tool_definitions.append(self._tool_converter.from_callable(tool))
 
             # Extract Dapr-specific configuration
             message_bus_name = getattr(agent, "message_bus_name", "messagepubsub")

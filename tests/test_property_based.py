@@ -172,8 +172,7 @@ def dapr_agent_configs(draw: st.DrawFn) -> DaprAgentConfig:
     port = draw(st.integers(min_value=1024, max_value=65535))
     agent_type = draw(st.sampled_from(list(DaprAgentType)))
     tool_defs = [
-        draw(tool_definitions()).model_dump()
-        for _ in range(draw(st.integers(min_value=0, max_value=2)))
+        draw(tool_definitions()) for _ in range(draw(st.integers(min_value=0, max_value=2)))
     ]
 
     return DaprAgentConfig(

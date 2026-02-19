@@ -6,7 +6,7 @@ apps:
     command: ["uv", "run", "python", "app.py"]
     resourcesPaths:
       - ./components
-      - ../../../dapr/components/secrets
+      - ../../_shared/dapr/components/secrets
       - ../../_shared/dapr/components/openai
       - ../../_shared/dapr/components/workflow
       - ../../_shared/dapr/components/redis
