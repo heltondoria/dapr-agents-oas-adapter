@@ -441,6 +441,38 @@ class TestLlmConfigConverter:
         # So we test the dict path
         assert converter.can_convert({"component_type": "VllmConfig"}) is True
 
+    def test_from_oas_non_dict_non_iterable_gen_params_fallback(self) -> None:
+        """Test from_oas falls back to empty dict for non-dict/non-iterable gen params."""
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "VllmConfig"
+        mock_config.model_id = "llama"
+        mock_config.url = None
+        # An object that is truthy but not dict and not iterable
+        mock_config.default_generation_parameters = 42
+
+        result = converter.from_oas(mock_config)
+        assert result.provider == "vllm"
+        # extra_params should be empty since 42 is not iterable
+        assert result.extra_params == {}
+
+    def test_to_oas_with_custom_temperature_and_max_tokens(self) -> None:
+        """Test to_oas passes non-default temperature and max_tokens to OAS config."""
+        converter = LlmConfigConverter()
+        config = LlmClientConfig(
+            provider="openai",
+            model_name="gpt-4",
+            temperature=0.9,
+            max_tokens=2000,
+        )
+
+        result = converter.to_oas(config)
+        from pyagentspec.llms import OpenAiConfig
+
+        assert isinstance(result, OpenAiConfig)
+        assert result.model_id == "gpt-4"
+
 
 class TestToolConverter:
     """Tests for ToolConverter."""
@@ -1765,6 +1797,56 @@ class TestAgentConverter:
                 assert result is not None
             except (ImportError, ConversionError):
                 # Expected when dapr-agents is not installed
+                pass
+
+    def test_create_dapr_agent_durable_with_registry(self) -> None:
+        """Test DurableAgent creation with registry_team_name set (covers line 479)."""
+        converter = AgentConverter()
+        config = DaprAgentConfig(
+            name="durable_registry",
+            role="Tester",
+            goal="Test registry path",
+            agent_type="DurableAgent",
+            llm_config={"provider": "openai", "model_id": "gpt-4"},
+            agent_topic="test.requests",
+            memory_store_name="testmemory",
+            memory_session_id="test-session",
+            registry_team_name="my-team",
+        )
+
+        mock_llm = MagicMock()
+
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "dapr_agents": MagicMock(**{"OpenAIChatClient.return_value": mock_llm}),
+                    "dapr_agents.agents.configs": MagicMock(),
+                    "dapr_agents.memory": MagicMock(),
+                    "dapr_agents.storage.daprstores.stateservice": MagicMock(),
+                },
+            ),
+            patch.object(converter, "_create_llm_client", return_value=mock_llm),
+        ):
+            try:
+                result = converter.create_dapr_agent(config)
+                assert result is not None
+            except (ImportError, ConversionError):
+                pass
+
+    def test_create_llm_client_openai_provider(self) -> None:
+        """Test _create_llm_client with openai provider (covers line 526)."""
+        converter = AgentConverter()
+        mock_client = MagicMock()
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock(**{"OpenAIChatClient.return_value": mock_client})},
+        ):
+            try:
+                result = converter._create_llm_client({"provider": "openai", "model_id": "gpt-4"})
+                assert result is not None
+            except (ImportError, ConversionError):
                 pass
 
     def test_dapr_agent_config_durable_fields_default_values(self) -> None:

@@ -147,7 +147,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmClientConfig]):
                 model_id=component.model_name,
                 url=component.url or "http://localhost:11434",
             )
-        raise ConversionError(
+        raise ConversionError(  # pragma: no cover
             f"Unhandled OAS type: {oas_type}",
             component,
             suggestion="This is an internal error, please report it",
