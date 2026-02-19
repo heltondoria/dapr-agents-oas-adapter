@@ -106,13 +106,17 @@ class ConversionError(DaprAgentsOasAdapterError):
             suggestion: The suggestion to add
 
         Returns:
-            New ConversionError with the suggestion
+            New ConversionError with the suggestion (preserves any existing __cause__)
         """
-        return ConversionError(
+        new_error = ConversionError(
             self._message,
             self.component,
             suggestion=suggestion,
         )
+        if self.__cause__ is not None:
+            new_error.__cause__ = self.__cause__
+            new_error.__suppress_context__ = True
+        return new_error
 
     def with_cause(self, cause: Exception) -> "ConversionError":
         """Create a new error with an added cause.
@@ -129,6 +133,7 @@ class ConversionError(DaprAgentsOasAdapterError):
             suggestion=self.suggestion,
         )
         new_error.__cause__ = cause
+        new_error.__suppress_context__ = True
         return new_error
 
 

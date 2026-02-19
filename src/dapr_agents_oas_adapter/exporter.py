@@ -265,6 +265,7 @@ class DaprAgentSpecExporter:
             )
 
         except Exception as e:
+            self._logger.error("extract_agent_config failed", exc_info=True)
             raise ConversionError(
                 "Failed to extract configuration from Dapr agent",
                 agent,
@@ -367,6 +368,7 @@ class DaprAgentSpecExporter:
             )
 
         except Exception as e:
+            self._logger.error("extract_workflow_definition failed", exc_info=True)
             raise ConversionError(
                 "Failed to extract definition from Dapr workflow",
                 workflow_func,

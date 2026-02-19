@@ -109,6 +109,7 @@ class DaprAgentSpecLoader:
         except ConversionError:
             raise
         except Exception as e:
+            self._logger.error("load_json failed", exc_info=True)
             raise ConversionError(
                 "Failed to load JSON",
                 suggestion="Ensure the JSON is valid and follows the OAS schema",
@@ -132,6 +133,7 @@ class DaprAgentSpecLoader:
         except ConversionError:
             raise
         except Exception as e:
+            self._logger.error("load_yaml failed", exc_info=True)
             raise ConversionError(
                 "Failed to load YAML",
                 suggestion="Ensure the YAML is valid and follows the OAS schema",

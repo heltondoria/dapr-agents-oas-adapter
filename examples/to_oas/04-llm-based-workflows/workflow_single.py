@@ -57,10 +57,10 @@ def _run() -> None:
     instance_id = client.schedule_new_workflow(workflow=single_task_workflow, input="Grace Hopper")
 
     state = client.wait_for_workflow_completion(instance_id)
-    if not state or state.runtime_status.name == "COMPLETED" or state.failure_details:
-        pass
+    if not state or state.runtime_status.name != "COMPLETED" or state.failure_details:
+        print(f"Workflow failed: {state}")
     else:
-        pass
+        print(f"Workflow completed: {state.serialized_output}")
 
     runtime.shutdown()
 

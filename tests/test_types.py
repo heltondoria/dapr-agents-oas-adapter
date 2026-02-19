@@ -402,13 +402,13 @@ class TestFrozenModels:
         """Verify assigning to a field on a frozen LlmClientConfig raises ValidationError."""
         config = LlmClientConfig(provider="openai", model_name="gpt-4")
         with pytest.raises(ValidationError):
-            config.provider = "ollama"  # type: ignore[misc]
+            config.provider = "ollama"
 
     def test_dapr_agent_config_frozen_raises_validation_error(self) -> None:
         """Verify assigning to a field on a frozen DaprAgentConfig raises ValidationError."""
         config = DaprAgentConfig(name="test_agent")
         with pytest.raises(ValidationError):
-            config.name = "new_name"  # type: ignore[misc]
+            config.name = "new_name"
 
     def test_tool_definition_default_tool_type(self) -> None:
         """Verify ToolDefinition has default tool_type of 'function'."""

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 # Type aliases for clarity
@@ -73,6 +73,15 @@ class LlmClientConfig(BaseModel):
 
     provider: str = Field(description="LLM provider name (e.g. openai, ollama, vllm)")
     model_name: str = Field(description="Model name or identifier")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_model_id(cls, data: Any) -> Any:
+        """Accept legacy ``model_id`` key as alias for ``model_name``."""
+        if isinstance(data, dict) and "model_id" in data and "model_name" not in data:
+            data = {**data, "model_name": data.pop("model_id")}
+        return data
+
     url: str | None = Field(default=None, description="Provider API URL")
     api_key: str | None = Field(default=None, description="Provider API key")
     temperature: float = Field(default=0.7, description="Sampling temperature")

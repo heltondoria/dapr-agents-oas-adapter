@@ -24,6 +24,12 @@ def get_logger() -> logging.Logger:
 def set_logger(logger: logging.Logger) -> None:
     """Inject a custom logger to replace the default.
 
+    Call this **before** creating ``DaprAgentSpecLoader``,
+    ``DaprAgentSpecExporter``, or ``AsyncDaprAgentSpecLoader`` instances,
+    because those classes capture the logger at construction time via
+    ``get_logger()``. Objects created before ``set_logger()`` is called
+    will continue using the previous logger.
+
     Args:
         logger: A ``logging.Logger`` instance to use for all library logging.
     """

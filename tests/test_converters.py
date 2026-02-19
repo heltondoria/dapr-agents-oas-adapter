@@ -1837,11 +1837,14 @@ class TestAgentConverter:
 
         mock_llm = MagicMock()
 
+        mock_dapr_agents = MagicMock()
+        mock_dapr_agents.OpenAIChatClient.return_value = mock_llm
+
         with (
             patch.dict(
                 "sys.modules",
                 {
-                    "dapr_agents": MagicMock(**{"OpenAIChatClient.return_value": mock_llm}),
+                    "dapr_agents": mock_dapr_agents,
                     "dapr_agents.agents.configs": MagicMock(),
                     "dapr_agents.memory": MagicMock(),
                     "dapr_agents.storage.daprstores.stateservice": MagicMock(),
@@ -1860,9 +1863,12 @@ class TestAgentConverter:
         converter = AgentConverter()
         mock_client = MagicMock()
 
+        mock_dapr_agents = MagicMock()
+        mock_dapr_agents.OpenAIChatClient.return_value = mock_client
+
         with patch.dict(
             "sys.modules",
-            {"dapr_agents": MagicMock(**{"OpenAIChatClient.return_value": mock_client})},
+            {"dapr_agents": mock_dapr_agents},
         ):
             try:
                 result = converter._create_llm_client({"provider": "openai", "model_id": "gpt-4"})
@@ -1874,7 +1880,8 @@ class TestAgentConverter:
         """Test _create_llm_client reads model_name key when present."""
         converter = AgentConverter()
         mock_client = MagicMock()
-        mock_module = MagicMock(**{"OpenAIChatClient.return_value": mock_client})
+        mock_module = MagicMock()
+        mock_module.OpenAIChatClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"dapr_agents": mock_module}):
             try:
@@ -2644,7 +2651,7 @@ class TestNodeConverter:
 
         # Create a mock that will pass isinstance(node, LlmNode)
         mock_node = MagicMock()
-        mock_node.__class__ = LlmNode  # type: ignore[assignment]
+        mock_node.__class__ = LlmNode
         mock_node.prompt_template = "Test prompt"
         mock_node.llm_config = None
 
@@ -2661,7 +2668,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = ToolNode  # type: ignore[assignment]
+        mock_node.__class__ = ToolNode
         mock_tool = MagicMock()
         mock_tool.name = "my_tool"
         mock_tool.model_dump.return_value = {"name": "my_tool"}
@@ -2677,7 +2684,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = AgentNode  # type: ignore[assignment]
+        mock_node.__class__ = AgentNode
         mock_agent = MagicMock()
         mock_agent.model_dump.return_value = {"name": "assistant"}
         mock_node.agent = mock_agent
@@ -2692,7 +2699,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = FlowNode  # type: ignore[assignment]
+        mock_node.__class__ = FlowNode
         mock_flow = MagicMock()
         mock_flow.id = "flow_123"
         mock_flow.name = "sub_flow"
@@ -2708,7 +2715,7 @@ class TestNodeConverter:
         converter = NodeConverter()
 
         mock_node = MagicMock()
-        mock_node.__class__ = MapNode  # type: ignore[assignment]
+        mock_node.__class__ = MapNode
         mock_node.parallel = True
         mock_inner = MagicMock()
         mock_inner.id = "inner_123"
