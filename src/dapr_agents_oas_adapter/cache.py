@@ -165,7 +165,7 @@ class InMemoryCache[T](CacheBackend[T]):
 
     def _evict_oldest(self) -> None:
         """Evict the oldest entry from the cache."""
-        if not self._cache:
+        if not self._cache:  # pragma: no cover
             return
 
         oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].created_at)

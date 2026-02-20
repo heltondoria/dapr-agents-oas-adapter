@@ -604,7 +604,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
         if not goal and system_prompt:
             # Try to extract goal from system prompt
             lines = system_prompt.strip().split("\n")
-            if lines:
+            if lines:  # pragma: no branch  # split("\n") never returns []
                 goal = lines[0][:200]  # First line, truncated
 
         return role, goal
