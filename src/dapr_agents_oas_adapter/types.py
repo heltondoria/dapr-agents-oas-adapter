@@ -22,7 +22,7 @@ class NamedCallable(Protocol):
     __name__: str
     __doc__: str | None
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pragma: no cover
 
 
 class OASComponentType(str, Enum):
@@ -78,7 +78,7 @@ class LlmProviderConfig(BaseModel):
     @classmethod
     def _accept_legacy_aliases(cls, data: Any) -> Any:
         """Accept ``model_id`` as alias for ``model_name`` and ``url`` for ``base_url``."""
-        if isinstance(data, dict):
+        if isinstance(data, dict):  # pragma: no branch
             if "model_id" in data and "model_name" not in data:
                 data = {**data, "model_name": data["model_id"]}
                 del data["model_id"]
@@ -89,7 +89,7 @@ class LlmProviderConfig(BaseModel):
 
     base_url: str | None = Field(default=None, description="Custom API endpoint URL")
     api_key: str | None = Field(default=None, description="Provider API key")
-    temperature: float = Field(default=0.7, description="Sampling temperature")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int | None = Field(default=None, description="Maximum tokens to generate")
     extra_params: dict[str, Any] = Field(
         default_factory=dict, description="Additional provider-specific parameters"
@@ -185,7 +185,7 @@ class DaprAgentConfig(BaseModel):
     agents_registry_store_name: str = Field(
         default="agentsregistry", description="Dapr agents registry store name"
     )
-    service_port: int = Field(default=8000, description="Service listening port")
+    service_port: int = Field(default=8000, ge=1, le=65535, description="Service listening port")
     # Additional fields for type safety
     agent_type: str | None = Field(default=None, description="Agent class type name")
     llm_config: LlmProviderConfig | None = Field(

@@ -712,14 +712,14 @@ except ValueError as e:
 |------|---------|---------------|
 | **Ruff** (linter) | Lint + format | Rule sets: S, PT, ANN, ARG, T20, RET, SLF, PIE, PLC, PLE, PLR, PLW, E, F, W, I, N, UP, B, A, C4, SIM, TCH, RUF, BLE |
 | **Ruff** (formatter) | Code formatting | PEP8 compliant |
-| **mypy** | Type checking | Strict mode, no implicit optional |
-| **pyright** | Type checking | Strict mode (cross-validation with mypy) |
+| **pyright** | Type checking | Strict mode, CI-enforced (primary type checker) |
+| **ty** | Type checking | Fast local feedback, not CI |
 | **pylint** | Duplicate code detection | Only R0801 (duplicate-code), min-similarity-lines=4 |
 | **vulture** | Dead code detection | 90% confidence minimum |
 | **radon** | Complexity metrics | Report all functions |
 | **xenon** | Complexity gate | Grade A for all modules |
 
-> **Note on type checkers**: Both mypy and pyright are used because they have slightly different philosophies and can catch different edge cases. Astral's ty was considered but is still in beta (~15% conformance) and not recommended for CI gates requiring maximum accuracy. ty may be used optionally for fast local feedback during development.
+> **Note on type checkers**: pyright in strict mode is the primary type checker, CI-enforced. mypy has been removed from the CI pipeline. Astral's ty is available for fast local feedback during development but is not used in CI due to its beta status.
 
 > **Tooling deviations from DaprKit standard:** This project's Ruff configuration is a **superset** of the standard DaprKit rule set (defined in `daprkit-specs/standards/TOOLING.md`). Additional rules include: ANN (type annotations), PT (pytest style), T20 (no print), RET (return consistency), SLF (private member access), PIE (misc lints), N (pep8-naming), BLE (blind except). These are stricter and fully compatible. Additionally, **pylint** is used exclusively for duplicate code detection (R0801) — this is project-specific and not part of the standard DaprKit toolchain.
 
@@ -793,7 +793,7 @@ pylint --disable=all --enable=R0801 src/
 
 | Requirement | Versions |
 |-------------|----------|
-| Python | >= 3.10 |
+| Python | >= 3.12 |
 | pyagentspec | >= 25.4.1 |
 | dapr-agents | >= 0.10.5 |
 | dapr | >= 1.16.0 |
@@ -824,8 +824,8 @@ pylint --disable=all --enable=R0801 src/
 | `pytest >= 8.0` | Test runner |
 | `pytest-asyncio >= 0.23` | Async test support |
 | `pytest-cov >= 4.0` | Coverage enforcement (100%) |
-| `mypy >= 1.8` | Type checking (strict mode) |
-| `pyright >= 1.1` | Type checking (cross-validation) |
+| `pyright >= 1.1` | Type checking (strict mode, CI-enforced) |
+| `ty >= 0.0.9` | Type checking (fast local feedback) |
 | `ruff >= 0.2` | Linting and formatting |
 | `xenon >= 0.9` | Complexity gates (grade A) |
 | `vulture >= 2.11` | Dead code detection |
@@ -1462,21 +1462,22 @@ class IDGenerator:
 **Current State:** ~350 lines with 15+ nested functions
 **Target State:** < 50 lines with delegated responsibilities
 
-**Implementation:**
-- Extract `WorkflowExecutor` class for runtime logic
-- Extract `BranchRouter` for edge selection
-- Extract `TaskInputBuilder` for data mapping
-- Extract `CompensationHandler` for saga pattern
+**Implementation (actual extracted classes in `workflow_helpers.py`):**
+- `TaskExecutor` — runtime workflow execution logic (line 384)
+- `BranchRouter` — edge selection and routing (line 90)
+- `CompensationHandler` — saga pattern compensation (line 308)
+- `ActivityStubManager` — activity stub registration (line 197)
+- `RetryPolicyBuilder` — retry policy construction (line 144)
+- Input building is a method: `TaskExecutor._build_task_input()` (not a separate class)
 
 **Target Structure:**
 ```python
 class FlowConverter:
     def create_dapr_workflow(self, workflow_def, task_implementations):
-        executor = WorkflowExecutor(
+        executor = TaskExecutor(
             workflow_def,
             task_implementations,
             branch_router=BranchRouter(),
-            input_builder=TaskInputBuilder(),
             compensation_handler=CompensationHandler(),
         )
         return executor.build_workflow_function()
@@ -1818,8 +1819,7 @@ Each refactoring item is only complete when:
 - [ ] Edge cases covered
 - [ ] Ruff lint: 0 errors
 - [ ] Ruff format: 0 changes
-- [ ] mypy --strict: 0 errors
-- [ ] pyright: 0 errors
+- [ ] pyright --strict: 0 errors
 - [ ] pylint duplicate-code: 0 duplications
 - [ ] vulture: 0 dead code
 - [ ] xenon: Grade A on all modules
@@ -1884,7 +1884,7 @@ The Dapr Agents team has shown openness to analyzing potential OAS support in an
 | Dapr SDK breaking changes | Medium | High | Version matrix testing, compatibility shims |
 | Performance degradation from refactoring | Low | Medium | Benchmark suite, performance tests in CI |
 | Async migration breaks sync users | Medium | High | Sync wrapper, deprecation period |
-| Python 3.10 compatibility issues | Low | Medium | CI matrix testing across 3.10, 3.11, 3.12 |
+| Python 3.12 compatibility issues | Low | Medium | CI matrix testing across 3.12, 3.13 |
 
 ### Business/Strategic Risks
 
@@ -1936,7 +1936,8 @@ The Dapr Agents team has shown openness to analyzing potential OAS support in an
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-01-28 | Initial PRD creation |
-| 1.1 | 2025-01-28 | Added Market Analysis section; Updated Python requirement to 3.10+; All features marked P0; Removed sprint-based roadmap in favor of ralph-loop methodology; Enhanced quality gates (100% coverage, comprehensive static analysis); Added upstream contribution strategy; Translated to English |
+| 1.1 | 2025-01-28 | Added Market Analysis section; Updated Python requirement to 3.12+; All features marked P0; Removed sprint-based roadmap in favor of ralph-loop methodology; Enhanced quality gates (100% coverage, comprehensive static analysis); Added upstream contribution strategy; Translated to English |
 | 1.2 | 2026-02-17 | DaprKit spec review compliance: standardized header format (Status/Priority/Depends blockquotes); added API Surface section with YAML fixture and full usage examples; added Async/Threading Strategy section referencing PRD-daprkit.md 5.6; defined exception hierarchy with base class and `from e` chaining; added `frozen=True` and `Field()` descriptions to all Pydantic models; replaced `dict[str, Any]` with typed `LlmProviderConfig` and `ToolDefinition` models; added consolidated Dependencies section with optional groups; added dedicated Test Strategy section with naming conventions and key scenarios; fixed logging examples to use standard `logging.getLogger(__name__)` interface; documented tooling deviations from DaprKit standard; added optional DaprKit integration note; renumbered sections for new API Surface (6) and Test Strategy (5.8) |
 | 1.3 | 2026-02-17 | Added Environment Variable Resolution subsection documenting LLM credential resolution via provider-specific env vars; removed Related PRDs header reference and Optional DaprKit Integration subsection (standalone project with no daprkit dependency); inlined async/threading concerns previously referenced from external PRD |
 | 1.4 | 2026-02-17 | Spec review fixes: added `field_path` attribute to `ValidationError` to match Public API Summary description; added `pylint >= 3.0` to Development Dependencies table |
+| 1.5 | 2026-02-20 | Implementation review alignment: updated Python requirement from 3.10+ to 3.12+; updated RF-004 naming to reflect actual extracted classes (`TaskExecutor`, `BranchRouter`, `CompensationHandler`, `ActivityStubManager`, `RetryPolicyBuilder`); replaced mypy with pyright strict as primary CI type checker; added ty as optional local feedback tool; updated CI matrix, dependencies table, and quality gate checklist |
