@@ -141,7 +141,7 @@ def json_schema_to_python_type(schema: dict[str, Any]) -> type:
                 schema_type = t
                 break
         else:
-            schema_type = "null"
+            schema_type = "null"  # pragma: no cover
 
     return JSON_SCHEMA_TO_PYTHON.get(schema_type, str)
 

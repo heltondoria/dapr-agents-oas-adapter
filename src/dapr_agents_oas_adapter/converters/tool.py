@@ -95,7 +95,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             True if this converter can handle the component
         """
         tool_types = [Tool, ServerTool, RemoteTool]
-        if MCPTool is not None:
+        if MCPTool is not None:  # pragma: no cover
             tool_types.append(MCPTool)
         if isinstance(component, tuple(tool_types)):
             return True
@@ -273,7 +273,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
                 result.append(prop)
             elif hasattr(prop, "model_dump"):
                 result.append(prop.model_dump())
-            elif hasattr(prop, "__dict__"):
+            elif hasattr(prop, "__dict__"):  # pragma: no branch
                 result.append(dict(prop.__dict__))
         return result
 

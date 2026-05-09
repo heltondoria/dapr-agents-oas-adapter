@@ -5,7 +5,7 @@ actionable error messages for invalid configurations.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, ClassVar
 
 from dapr_agents_oas_adapter.exceptions import ValidationError as _BaseValidationError
@@ -16,7 +16,7 @@ from dapr_agents_oas_adapter.types import (
 )
 
 
-class ValidationSeverity(str, Enum):
+class ValidationSeverity(StrEnum):
     """Severity levels for validation issues."""
 
     ERROR = "error"

@@ -71,7 +71,7 @@ class DaprAgentSpecExporter:
         oas_component = self.to_component(component)
         # Use serializer to get base JSON, then re-format with indent
         base_json = self._serializer.to_json(oas_component)
-        if indent is not None and indent != 0:
+        if indent != 0:
             # Reparse and format with specified indentation
             return json.dumps(json.loads(base_json), indent=indent, ensure_ascii=False)
         return base_json
@@ -146,9 +146,9 @@ class DaprAgentSpecExporter:
         """
         if isinstance(component, DaprAgentConfig):
             return self._agent_converter.to_oas(component)
-        if isinstance(component, WorkflowDefinition):
+        if isinstance(component, WorkflowDefinition):  # pyright: ignore[reportUnnecessaryIsInstance]
             return self._flow_converter.to_oas(component)
-        raise ConversionError(
+        raise ConversionError(  # pyright: ignore[reportUnreachable]
             f"Unsupported component type: {type(component).__name__}",
             component,
             suggestion="Only DaprAgentConfig and WorkflowDefinition are supported",

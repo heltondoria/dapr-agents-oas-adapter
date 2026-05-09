@@ -15,7 +15,7 @@ uv sync --all-groups              # Install all dependencies including dev
 # Testing
 uv run pytest                     # Run all tests
 uv run pytest -v                  # Verbose output
-uv run pytest --cov=src/dapr_agents_oas_adapter --cov-fail-under=90  # With coverage (90% required)
+uv run pytest --cov=src/dapr_agents_oas_adapter --cov-fail-under=100  # With coverage (100% required)
 uv run pytest tests/test_converters.py -k "test_name"  # Run single test
 
 # Linting & Formatting
@@ -25,7 +25,8 @@ uv run ruff format .              # Format code
 uv run ruff format --check .      # Check formatting without changes
 
 # Type Checking
-uv run ty check                   # Type check (replaces mypy/pyright)
+uv run pyright src/                   # Type check (CI, strict mode)
+uv run ty check                       # Type check (local, fast feedback)
 
 # Code Quality
 uv run codespell .                # Spell check
@@ -134,4 +135,4 @@ dapr run -f dapr.yaml -- python script.py
 
 ## CI Quality Gates
 
-All PRs must pass: lint, format, type-check, spell-check, dead-code, tests (90% coverage), security scan.
+All PRs must pass: lint, format, type-check, spell-check, dead-code, tests (100% coverage), security scan.

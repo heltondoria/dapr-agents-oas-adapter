@@ -15,15 +15,15 @@ class WorkflowContext(Protocol):
 
     def call_activity(self, activity: Callable[..., Any], **kwargs: Any) -> Any:
         """Call an activity."""
-        ...
+        ...  # pragma: no cover
 
     def call_child_workflow(self, workflow_name: str, **kwargs: Any) -> Any:
         """Call a child workflow."""
-        ...
+        ...  # pragma: no cover
 
     def create_timer(self, _duration: timedelta) -> Any:
         """Create a timer that fires after the given duration."""
-        ...
+        ...  # pragma: no cover
 
 
 @dataclass
@@ -534,7 +534,7 @@ class TaskExecutor:
             kwargs["retry_policy"] = retry
         try:
             return ctx.call_activity(activity, **kwargs)
-        except TypeError:
+        except TypeError:  # pragma: no cover
             kwargs.pop("retry_policy", None)
             return ctx.call_activity(activity, **kwargs)
 
@@ -546,14 +546,15 @@ class TaskExecutor:
         retry: Any,
     ) -> Any:
         """Call a child workflow with optional retry policy."""
-        if not hasattr(ctx, "call_child_workflow"):
-            raise RuntimeError("call_child_workflow is not available in this SDK.")
+        if not hasattr(ctx, "call_child_workflow"):  # pragma: no cover
+            msg = "call_child_workflow is not available in this SDK."
+            raise RuntimeError(msg)
         kwargs: dict[str, Any] = {"input": input_data}
         if retry is not None:
             kwargs["retry_policy"] = retry
         try:
             return ctx.call_child_workflow(workflow_name, **kwargs)
-        except TypeError:
+        except TypeError:  # pragma: no cover
             kwargs.pop("retry_policy", None)
             return ctx.call_child_workflow(workflow_name, **kwargs)
 

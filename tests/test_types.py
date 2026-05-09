@@ -416,6 +416,55 @@ class TestPydanticFeatures:
         assert restored.extra_params == original.extra_params
 
 
+class TestFieldValidationConstraints:
+    """Tests for field-level validation bounds."""
+
+    def test_temperature_rejects_negative(self) -> None:
+        """Verify temperature rejects values below 0.0."""
+        with pytest.raises(ValidationError):
+            LlmProviderConfig(provider="openai", model_name="gpt-4", temperature=-0.1)
+
+    def test_temperature_rejects_above_max(self) -> None:
+        """Verify temperature rejects values above 2.0."""
+        with pytest.raises(ValidationError):
+            LlmProviderConfig(provider="openai", model_name="gpt-4", temperature=2.1)
+
+    def test_temperature_accepts_boundary_min(self) -> None:
+        """Verify temperature accepts 0.0 (lower bound)."""
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4", temperature=0.0)
+        assert config.temperature == 0.0
+
+    def test_temperature_accepts_boundary_max(self) -> None:
+        """Verify temperature accepts 2.0 (upper bound)."""
+        config = LlmProviderConfig(provider="openai", model_name="gpt-4", temperature=2.0)
+        assert config.temperature == 2.0
+
+    def test_service_port_rejects_zero(self) -> None:
+        """Verify service_port rejects 0."""
+        with pytest.raises(ValidationError):
+            DaprAgentConfig(name="test", service_port=0)
+
+    def test_service_port_rejects_negative(self) -> None:
+        """Verify service_port rejects negative values."""
+        with pytest.raises(ValidationError):
+            DaprAgentConfig(name="test", service_port=-1)
+
+    def test_service_port_rejects_above_max(self) -> None:
+        """Verify service_port rejects values above 65535."""
+        with pytest.raises(ValidationError):
+            DaprAgentConfig(name="test", service_port=65536)
+
+    def test_service_port_accepts_boundary_min(self) -> None:
+        """Verify service_port accepts 1 (lower bound)."""
+        config = DaprAgentConfig(name="test", service_port=1)
+        assert config.service_port == 1
+
+    def test_service_port_accepts_boundary_max(self) -> None:
+        """Verify service_port accepts 65535 (upper bound)."""
+        config = DaprAgentConfig(name="test", service_port=65535)
+        assert config.service_port == 65535
+
+
 class TestFrozenModels:
     """Tests for frozen model immutability."""
 
