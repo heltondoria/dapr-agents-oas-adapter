@@ -433,7 +433,7 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                         if config.memory_store_name is not None
                         else "memorystore"
                     ),
-                    session_id=(
+                    agent_name=(
                         config.memory_session_id
                         if config.memory_session_id is not None
                         else f"{config.name}-session"

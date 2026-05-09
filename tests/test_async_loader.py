@@ -100,7 +100,7 @@ class TestAsyncDaprAgentSpecLoader:
                 assert isinstance(result, DaprAgentConfig)
                 assert result.name == "test_agent"
             finally:
-                Path(file_path).unlink()
+                Path(file_path).unlink()  # noqa: ASYNC240
 
     @pytest.mark.asyncio
     async def test_load_yaml_file(self, loader: AsyncDaprAgentSpecLoader) -> None:
@@ -117,7 +117,7 @@ class TestAsyncDaprAgentSpecLoader:
                 assert isinstance(result, DaprAgentConfig)
                 assert result.name == "test_agent"
             finally:
-                Path(file_path).unlink()
+                Path(file_path).unlink()  # noqa: ASYNC240
 
     @pytest.mark.asyncio
     async def test_load_dict(
@@ -154,7 +154,7 @@ class TestAsyncDaprAgentSpecLoader:
                 assert all(isinstance(r, DaprAgentConfig) for r in results)
         finally:
             for file_path in files:
-                Path(file_path).unlink()
+                Path(file_path).unlink()  # noqa: ASYNC240
 
     @pytest.mark.asyncio
     async def test_get_sync_loader(self, loader: AsyncDaprAgentSpecLoader) -> None:

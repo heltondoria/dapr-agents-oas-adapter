@@ -1,7 +1,7 @@
 """Type definitions and mappings for OAS <-> Dapr Agents conversion."""
 
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -25,7 +25,7 @@ class NamedCallable(Protocol):
     def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pragma: no cover
 
 
-class OASComponentType(str, Enum):
+class OASComponentType(StrEnum):
     """Open Agent Spec component types."""
 
     AGENT = "Agent"
@@ -49,7 +49,7 @@ class OASComponentType(str, Enum):
     OCI_GENAI_CONFIG = "OciGenAiConfig"
 
 
-class DaprAgentType(str, Enum):
+class DaprAgentType(StrEnum):
     """Dapr Agents agent types."""
 
     AGENT = "Agent"
@@ -58,7 +58,7 @@ class DaprAgentType(str, Enum):
     REACT_AGENT = "ReActAgent"
 
 
-class OrchestratorType(str, Enum):
+class OrchestratorType(StrEnum):
     """Dapr Agents orchestrator types."""
 
     LLM = "LLMOrchestrator"
