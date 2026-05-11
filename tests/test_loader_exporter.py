@@ -671,7 +671,7 @@ class TestDaprAgentSpecExporter:
         result = exporter.to_dict(config)
         assert result["component_type"] == "Agent"
         assert result["name"] == "assistant"
-        assert result["agentspec_version"] == "25.4.1"
+        assert result["agentspec_version"] == DaprAgentSpecExporter.AGENTSPEC_VERSION
 
     def test_to_dict_workflow(self) -> None:
         """Test exporting workflow definition to dictionary."""
@@ -694,7 +694,7 @@ class TestDaprAgentSpecExporter:
         result = exporter.to_dict(workflow)
         assert result["component_type"] == "Flow"
         assert result["name"] == "my_workflow"
-        assert result["agentspec_version"] == "25.4.1"
+        assert result["agentspec_version"] == DaprAgentSpecExporter.AGENTSPEC_VERSION
 
     def test_to_json(self) -> None:
         """Test exporting to JSON string."""
