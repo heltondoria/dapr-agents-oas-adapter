@@ -2203,6 +2203,54 @@ class TestAgentConverter:
                 converter.create_dapr_agent(config)
             assert "Failed to create Dapr Agent" in str(exc_info.value)
 
+    def test_create_llm_client_openai_compatible_provider(self) -> None:
+        """Test _create_llm_client with openai_compatible provider passes base_url and api_key."""
+        converter = AgentConverter()
+        llm_config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="local-llama",
+            base_url="http://localhost:8080/v1",
+            api_key="local-key",
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock()},
+        ):
+            import sys
+
+            mock_openai = MagicMock()
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(
+                model="local-llama",
+                base_url="http://localhost:8080/v1",
+                api_key="local-key",
+            )
+
+    def test_create_llm_client_openai_compatible_minimal(self) -> None:
+        """Test _create_llm_client with openai_compatible without base_url/api_key."""
+        converter = AgentConverter()
+        llm_config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="model-only",
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock()},
+        ):
+            import sys
+
+            mock_openai = MagicMock()
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(model="model-only")
+
     def test_create_llm_client_ollama_provider(self) -> None:
         """Test _create_llm_client with Ollama provider."""
         converter = AgentConverter()
