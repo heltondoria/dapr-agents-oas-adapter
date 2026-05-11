@@ -3566,6 +3566,10 @@
 
 
         <p>Dapr Agents agent types.</p>
+<p>As of dapr-agents 0.13.0, only <code>Agent</code> and <code>DurableAgent</code> exist.
+<code>ASSISTANT_AGENT</code> and <code>REACT_AGENT</code> are kept as aliases that resolve
+to <code>Agent</code> at runtime, so that existing serialised configs round-trip
+without error.</p>
 
 
 
