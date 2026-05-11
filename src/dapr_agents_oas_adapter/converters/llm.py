@@ -126,6 +126,19 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 suggestion=f"Supported providers are: {supported}",
             )
 
+        # Build generation parameters as LlmGenerationConfig
+        from pyagentspec.llms import LlmGenerationConfig
+
+        gen_kwargs: dict[str, Any] = {}
+        if component.temperature != 0.7:
+            gen_kwargs["temperature"] = component.temperature
+        if component.max_tokens:
+            gen_kwargs["max_tokens"] = component.max_tokens
+        top_p = component.extra_params.get("top_p")
+        if top_p is not None:
+            gen_kwargs["top_p"] = top_p
+        gen_config = LlmGenerationConfig(**gen_kwargs) if gen_kwargs else None
+
         # Build the OAS LlmConfig
         config_id = generate_id("llm")
         name = f"{component.provider}_{component.model_name}"
@@ -136,12 +149,14 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 name=name,
                 model_id=component.model_name,
                 url=component.base_url or "",
+                default_generation_parameters=gen_config,
             )
         if oas_type == "OpenAIConfig":
             return OpenAiConfig(
                 id=config_id,
                 name=name,
                 model_id=component.model_name,
+                default_generation_parameters=gen_config,
             )
         if oas_type == "OpenAiCompatibleConfig":
             return OpenAiCompatibleConfig(
@@ -150,6 +165,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 model_id=component.model_name,
                 url=component.base_url or "",
                 api_key=component.api_key,
+                default_generation_parameters=gen_config,
             )
         if oas_type == "OllamaConfig":
             return OllamaConfig(
@@ -157,6 +173,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 name=name,
                 model_id=component.model_name,
                 url=component.base_url or "http://localhost:11434",
+                default_generation_parameters=gen_config,
             )
         raise ConversionError(  # pragma: no cover
             f"Unhandled OAS type: {oas_type}",

@@ -497,6 +497,38 @@ class TestLlmConfigConverter:
         assert result.url == "http://localhost:8080/v1"
         assert result.api_key == "test-key"
 
+    def test_to_oas_preserves_generation_params(self) -> None:
+        """Test to_oas passes generation parameters to OAS config."""
+        from pyagentspec.llms import LlmGenerationConfig
+
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="openai",
+            model_name="gpt-4",
+            temperature=0.9,
+            max_tokens=2048,
+            extra_params={"top_p": 0.95},
+        )
+
+        result = converter.to_oas(config)
+        assert result.default_generation_parameters is not None
+        assert isinstance(result.default_generation_parameters, LlmGenerationConfig)
+        assert result.default_generation_parameters.temperature == 0.9
+        assert result.default_generation_parameters.max_tokens == 2048
+        assert result.default_generation_parameters.top_p == 0.95
+
+    def test_to_oas_no_generation_params_when_defaults(self) -> None:
+        """Test to_oas omits generation params when all defaults."""
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="vllm",
+            model_name="llama-3",
+            base_url="http://localhost:8000",
+        )
+
+        result = converter.to_oas(config)
+        assert result.default_generation_parameters is None
+
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()
