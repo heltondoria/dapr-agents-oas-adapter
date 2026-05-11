@@ -79,9 +79,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
             elif hasattr(default_gen_params, "model_dump"):
                 # Pydantic model (LlmGenerationConfig) — dump excluding unset fields
                 extra_params = {
-                    k: v
-                    for k, v in default_gen_params.model_dump().items()
-                    if v is not None
+                    k: v for k, v in default_gen_params.model_dump().items() if v is not None
                 }
             elif hasattr(default_gen_params, "__iter__"):
                 extra_params = dict(default_gen_params)
