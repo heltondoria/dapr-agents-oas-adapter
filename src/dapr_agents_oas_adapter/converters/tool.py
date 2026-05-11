@@ -301,57 +301,44 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
 
         return [{"title": "result", "type": json_type}]
 
-    # Transport field sets used by _parse_transport_dict / _build_transport_dict
-    _URL_TRANSPORT_KEYS = ("url", "headers", "sensitive_headers", "session_parameters")
-    _MTLS_KEYS = ("key_file", "cert_file", "ca_file")
-    _STDIO_KEYS = ("command", "args", "env", "cwd")
+    # All known transport field keys, shared by _parse/_build helpers.
+    _TRANSPORT_KEYS = (
+        # URL-based (SSE, StreamableHTTP, and their mTLS variants)
+        "url",
+        "headers",
+        "sensitive_headers",
+        "session_parameters",
+        # mTLS certificates
+        "key_file",
+        "cert_file",
+        "ca_file",
+        # StdioTransport
+        "command",
+        "args",
+        "env",
+        "cwd",
+    )
 
-    @staticmethod
-    def _parse_transport_dict(raw: dict[str, Any]) -> dict[str, Any]:
+    @classmethod
+    def _parse_transport_dict(cls, raw: dict[str, Any]) -> dict[str, Any]:
         """Parse a transport dict from OAS/dict representation into internal format."""
         config: dict[str, Any] = {
             "type": raw.get("component_type", "SSETransport"),
         }
-        # Copy all known transport fields that are present
-        for key in (
-            "url",
-            "headers",
-            "sensitive_headers",
-            "session_parameters",
-            "key_file",
-            "cert_file",
-            "ca_file",
-            "command",
-            "args",
-            "env",
-            "cwd",
-        ):
+        for key in cls._TRANSPORT_KEYS:
             if key in raw:
                 config[key] = raw[key]
         return config
 
-    @staticmethod
-    def _build_transport_dict(transport: dict[str, Any], name: str) -> dict[str, Any]:
+    @classmethod
+    def _build_transport_dict(cls, transport: dict[str, Any], name: str) -> dict[str, Any]:
         """Build an OAS-style transport dict from internal transport_config."""
         result: dict[str, Any] = {
             "component_type": transport.get("type", "SSETransport"),
             "id": generate_id("transport"),
             "name": name,
         }
-        # Emit all known transport fields (use 'is not None' to preserve empty values)
-        for key in (
-            "url",
-            "headers",
-            "sensitive_headers",
-            "session_parameters",
-            "key_file",
-            "cert_file",
-            "ca_file",
-            "command",
-            "args",
-            "env",
-            "cwd",
-        ):
+        for key in cls._TRANSPORT_KEYS:
             if transport.get(key) is not None:
                 result[key] = transport[key]
         return result
