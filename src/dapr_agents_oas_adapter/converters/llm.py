@@ -2,7 +2,13 @@
 
 from typing import Any, ClassVar
 
-from pyagentspec.llms import LlmConfig, OllamaConfig, OpenAiConfig, VllmConfig
+from pyagentspec.llms import (
+    LlmConfig,
+    OllamaConfig,
+    OpenAiCompatibleConfig,
+    OpenAiConfig,
+    VllmConfig,
+)
 
 from dapr_agents_oas_adapter.converters.base import ComponentConverter
 from dapr_agents_oas_adapter.exceptions import ConversionError
@@ -19,13 +25,15 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
     """Converter for OAS LlmConfig <-> Dapr LLM client configuration.
 
     Supports conversion between various OAS LLM configurations
-    (VllmConfig, OpenAiConfig, OllamaConfig) and Dapr's LlmProviderConfig.
+    (VllmConfig, OpenAiConfig, OpenAiCompatibleConfig, OllamaConfig) and
+    Dapr's LlmProviderConfig.
     """
 
     # Mapping of OAS LLM config types to their classes
     OAS_LLM_TYPES: ClassVar[dict[str, type[LlmConfig]]] = {
         "VllmConfig": VllmConfig,
         "OpenAIConfig": OpenAiConfig,
+        "OpenAiCompatibleConfig": OpenAiCompatibleConfig,
         "OllamaConfig": OllamaConfig,
     }
 
@@ -62,26 +70,27 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
         model_name = getattr(component, "model_id", "")
         url = getattr(component, "url", None)
 
-        # Extract generation parameters
+        # Extract generation parameters (may be a LlmGenerationConfig model or dict)
         extra_params: dict[str, Any] = {}
         default_gen_params = getattr(component, "default_generation_parameters", None)
-        if default_gen_params:
+        if default_gen_params is not None:
             if isinstance(default_gen_params, dict):
                 extra_params = default_gen_params.copy()
-            # Handle pydantic model or dataclass
+            elif hasattr(default_gen_params, "model_dump"):
+                # Pydantic model (LlmGenerationConfig) — dump excluding unset fields
+                extra_params = {
+                    k: v for k, v in default_gen_params.model_dump().items() if v is not None
+                }
             elif hasattr(default_gen_params, "__iter__"):
                 extra_params = dict(default_gen_params)
-            else:
-                extra_params = {}
 
-        # Extract temperature and max_tokens from extra params if present
+        # Extract temperature, max_tokens, top_p from generation params
         temperature = extra_params.pop("temperature", 0.7)
         max_tokens = extra_params.pop("max_tokens", None)
 
-        # Handle OpenAI-specific fields
-        api_key = None
-        if component_type == "OpenAIConfig":
-            api_key = getattr(component, "api_key", None)
+        # Handle api_key (available on OpenAIConfig and OpenAiCompatibleConfig)
+        raw_api_key = getattr(component, "api_key", None)
+        api_key = raw_api_key if isinstance(raw_api_key, str) else None
 
         return LlmProviderConfig(
             provider=provider,
@@ -93,7 +102,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
             extra_params=extra_params,
         )
 
-    def to_oas(self, component: LlmProviderConfig) -> VllmConfig | OpenAiConfig | OllamaConfig:
+    def to_oas(self, component: LlmProviderConfig) -> LlmConfig:
         """Convert a Dapr LlmProviderConfig to OAS LlmConfig.
 
         Args:
@@ -115,13 +124,18 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 suggestion=f"Supported providers are: {supported}",
             )
 
-        # Build generation parameters
-        gen_params: dict[str, Any] = {}
+        # Build generation parameters as LlmGenerationConfig
+        from pyagentspec.llms import LlmGenerationConfig
+
+        gen_kwargs: dict[str, Any] = {}
         if component.temperature != 0.7:
-            gen_params["temperature"] = component.temperature
+            gen_kwargs["temperature"] = component.temperature
         if component.max_tokens:
-            gen_params["max_tokens"] = component.max_tokens
-        gen_params.update(component.extra_params)
+            gen_kwargs["max_tokens"] = component.max_tokens
+        top_p = component.extra_params.get("top_p")
+        if top_p is not None:
+            gen_kwargs["top_p"] = top_p
+        gen_config = LlmGenerationConfig(**gen_kwargs) if gen_kwargs else None
 
         # Build the OAS LlmConfig
         config_id = generate_id("llm")
@@ -133,12 +147,23 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 name=name,
                 model_id=component.model_name,
                 url=component.base_url or "",
+                default_generation_parameters=gen_config,
             )
         if oas_type == "OpenAIConfig":
             return OpenAiConfig(
                 id=config_id,
                 name=name,
                 model_id=component.model_name,
+                default_generation_parameters=gen_config,
+            )
+        if oas_type == "OpenAiCompatibleConfig":
+            return OpenAiCompatibleConfig(
+                id=config_id,
+                name=name,
+                model_id=component.model_name,
+                url=component.base_url or "",
+                api_key=component.api_key,
+                default_generation_parameters=gen_config,
             )
         if oas_type == "OllamaConfig":
             return OllamaConfig(
@@ -146,6 +171,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 name=name,
                 model_id=component.model_name,
                 url=component.base_url or "http://localhost:11434",
+                default_generation_parameters=gen_config,
             )
         raise ConversionError(  # pragma: no cover
             f"Unhandled OAS type: {oas_type}",
@@ -222,6 +248,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
             gen_params["temperature"] = config.temperature
         if config.max_tokens:
             gen_params["max_tokens"] = config.max_tokens
+        # Preserve extra_params (includes top_p and other generation params)
         gen_params.update(config.extra_params)
 
         if gen_params:

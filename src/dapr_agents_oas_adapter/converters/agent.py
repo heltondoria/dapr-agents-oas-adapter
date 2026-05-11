@@ -511,9 +511,18 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                 from dapr_agents import OpenAIChatClient
 
                 return OpenAIChatClient(model=model_name)
+            if provider == "openai_compatible":
+                from dapr_agents import OpenAIChatClient
+
+                url = llm_config.base_url if llm_config else None
+                api_key = llm_config.api_key if llm_config else None
+                kwargs: dict[str, Any] = {"model": model_name}
+                if url:
+                    kwargs["base_url"] = url
+                if api_key:
+                    kwargs["api_key"] = api_key
+                return OpenAIChatClient(**kwargs)
             if provider == "ollama":
-                # Dapr Agents does not expose a dedicated Ollama client in all versions.
-                # Treat Ollama as an OpenAI-compatible endpoint.
                 from dapr_agents import OpenAIChatClient
 
                 url = llm_config.base_url if llm_config else "http://localhost:11434"

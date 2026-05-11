@@ -45,6 +45,7 @@ class OASComponentType(StrEnum):
     # LLM Config types
     VLLM_CONFIG = "VllmConfig"
     OPENAI_CONFIG = "OpenAIConfig"
+    OPENAI_COMPATIBLE_CONFIG = "OpenAiCompatibleConfig"
     OLLAMA_CONFIG = "OllamaConfig"
     OCI_GENAI_CONFIG = "OciGenAiConfig"
 
@@ -233,6 +234,7 @@ DAPR_TO_OAS_AGENT_TYPE: dict[DaprAgentType, str] = {
 OAS_LLM_TO_DAPR_PROVIDER: dict[str, str] = {
     "VllmConfig": "vllm",
     "OpenAIConfig": "openai",
+    "OpenAiCompatibleConfig": "openai_compatible",
     "OllamaConfig": "ollama",
     "OciGenAiConfig": "oci",
 }
@@ -240,6 +242,7 @@ OAS_LLM_TO_DAPR_PROVIDER: dict[str, str] = {
 DAPR_PROVIDER_TO_OAS_LLM: dict[str, str] = {
     "vllm": "VllmConfig",
     "openai": "OpenAIConfig",
+    "openai_compatible": "OpenAiCompatibleConfig",
     "ollama": "OllamaConfig",
     "oci": "OciGenAiConfig",
 }

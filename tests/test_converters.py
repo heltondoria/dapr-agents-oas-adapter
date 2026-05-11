@@ -443,6 +443,92 @@ class TestLlmConfigConverter:
         assert result.model_id == "llama2"
         assert result.url == "http://localhost:11434"
 
+    def test_from_oas_openai_compatible_config(self) -> None:
+        """Test from_oas with OpenAiCompatibleConfig."""
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "OpenAiCompatibleConfig"
+        mock_config.model_id = "local-llama"
+        mock_config.url = "http://localhost:8080/v1"
+        mock_config.api_key = "local-key"
+        mock_config.default_generation_parameters = None
+
+        result = converter.from_oas(mock_config)
+        assert result.provider == "openai_compatible"
+        assert result.model_name == "local-llama"
+        assert result.base_url == "http://localhost:8080/v1"
+        assert result.api_key == "local-key"
+
+    def test_from_oas_with_llm_generation_config(self) -> None:
+        """Test from_oas with LlmGenerationConfig (Pydantic model with model_dump)."""
+        from pyagentspec.llms import LlmGenerationConfig
+
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "VllmConfig"
+        mock_config.model_id = "llama-3"
+        mock_config.url = None
+        mock_config.default_generation_parameters = LlmGenerationConfig(
+            temperature=0.9, max_tokens=2048, top_p=0.95
+        )
+
+        result = converter.from_oas(mock_config)
+        assert result.temperature == 0.9
+        assert result.max_tokens == 2048
+        assert result.extra_params == {"top_p": 0.95}
+
+    def test_to_oas_openai_compatible(self) -> None:
+        """Test to_oas creates OpenAiCompatibleConfig."""
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="local-model",
+            base_url="http://localhost:8080/v1",
+            api_key="test-key",
+        )
+
+        result = converter.to_oas(config)
+        from pyagentspec.llms import OpenAiCompatibleConfig
+
+        assert isinstance(result, OpenAiCompatibleConfig)
+        assert result.model_id == "local-model"
+        assert result.url == "http://localhost:8080/v1"
+        assert result.api_key == "test-key"
+
+    def test_to_oas_preserves_generation_params(self) -> None:
+        """Test to_oas passes generation parameters to OAS config."""
+        from pyagentspec.llms import LlmGenerationConfig
+
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="openai",
+            model_name="gpt-4",
+            temperature=0.9,
+            max_tokens=2048,
+            extra_params={"top_p": 0.95},
+        )
+
+        result = converter.to_oas(config)
+        assert result.default_generation_parameters is not None
+        assert isinstance(result.default_generation_parameters, LlmGenerationConfig)
+        assert result.default_generation_parameters.temperature == 0.9
+        assert result.default_generation_parameters.max_tokens == 2048
+        assert result.default_generation_parameters.top_p == 0.95
+
+    def test_to_oas_no_generation_params_when_defaults(self) -> None:
+        """Test to_oas omits generation params when all defaults."""
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="vllm",
+            model_name="llama-3",
+            base_url="http://localhost:8000",
+        )
+
+        result = converter.to_oas(config)
+        assert result.default_generation_parameters is None
+
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()
@@ -2116,6 +2202,54 @@ class TestAgentConverter:
             with pytest.raises(ConversionError) as exc_info:
                 converter.create_dapr_agent(config)
             assert "Failed to create Dapr Agent" in str(exc_info.value)
+
+    def test_create_llm_client_openai_compatible_provider(self) -> None:
+        """Test _create_llm_client with openai_compatible provider passes base_url and api_key."""
+        converter = AgentConverter()
+        llm_config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="local-llama",
+            base_url="http://localhost:8080/v1",
+            api_key="local-key",
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock()},
+        ):
+            import sys
+
+            mock_openai = MagicMock()
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(
+                model="local-llama",
+                base_url="http://localhost:8080/v1",
+                api_key="local-key",
+            )
+
+    def test_create_llm_client_openai_compatible_minimal(self) -> None:
+        """Test _create_llm_client with openai_compatible without base_url/api_key."""
+        converter = AgentConverter()
+        llm_config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="model-only",
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {"dapr_agents": MagicMock()},
+        ):
+            import sys
+
+            mock_openai = MagicMock()
+            dapr_agents_module = cast("Any", sys.modules["dapr_agents"])
+            dapr_agents_module.OpenAIChatClient = mock_openai
+
+            converter._create_llm_client(llm_config)
+            mock_openai.assert_called_once_with(model="model-only")
 
     def test_create_llm_client_ollama_provider(self) -> None:
         """Test _create_llm_client with Ollama provider."""
