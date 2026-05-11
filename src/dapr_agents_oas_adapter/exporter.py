@@ -3,6 +3,7 @@
 import inspect
 import json
 from collections.abc import Callable
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,14 @@ from dapr_agents_oas_adapter.types import (
     DaprAgentConfig,
     WorkflowDefinition,
 )
+
+
+def _get_agentspec_version() -> str:
+    """Return the installed pyagentspec version at import time."""
+    try:
+        return version("pyagentspec")
+    except Exception:  # pragma: no cover
+        return "unknown"
 
 
 class DaprAgentSpecExporter:
@@ -41,7 +50,7 @@ class DaprAgentSpecExporter:
         ```
     """
 
-    AGENTSPEC_VERSION = "25.4.1"
+    AGENTSPEC_VERSION: str = _get_agentspec_version()
 
     def __init__(self) -> None:
         """Initialize the exporter."""
