@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 from pyagentspec.llms import (
     LlmConfig,
+    OciGenAiConfig,
     OllamaConfig,
     OpenAiCompatibleConfig,
     OpenAiConfig,
@@ -35,6 +36,7 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
         "OpenAIConfig": OpenAiConfig,
         "OpenAiCompatibleConfig": OpenAiCompatibleConfig,
         "OllamaConfig": OllamaConfig,
+        "OciGenAiConfig": OciGenAiConfig,
     }
 
     def __init__(self, tool_registry: ToolRegistry | None = None) -> None:
@@ -92,13 +94,20 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
         raw_api_key = getattr(component, "api_key", None)
         api_key = raw_api_key if isinstance(raw_api_key, str) else None
 
+        # Preserve OCI-specific fields in extra_params for round-trip
+        if component_type == "OciGenAiConfig":
+            for oci_key in ("compartment_id", "client_config", "serving_mode", "provider"):
+                val = getattr(component, oci_key, None)
+                if val is not None:
+                    extra_params[oci_key] = val
+
         return LlmProviderConfig(
             provider=provider,
             model_name=model_name,
             base_url=url,
             api_key=api_key,
-            temperature=float(temperature) if temperature else 0.7,
-            max_tokens=int(max_tokens) if max_tokens else None,
+            temperature=float(temperature) if temperature is not None else 0.7,
+            max_tokens=int(max_tokens) if max_tokens is not None else None,
             extra_params=extra_params,
         )
 
@@ -173,6 +182,20 @@ class LlmConfigConverter(ComponentConverter[LlmConfig, LlmProviderConfig]):
                 url=component.base_url or "http://localhost:11434",
                 default_generation_parameters=gen_config,
             )
+        if oas_type == "OciGenAiConfig":
+            # OciGenAiConfig requires compartment_id and client_config;
+            # these are stored in extra_params during from_oas.
+            oci_kwargs: dict[str, Any] = {
+                "id": config_id,
+                "name": name,
+                "model_id": component.model_name,
+                "default_generation_parameters": gen_config,
+            }
+            for oci_key in ("compartment_id", "client_config", "serving_mode", "provider"):
+                val = component.extra_params.get(oci_key)
+                if val is not None:
+                    oci_kwargs[oci_key] = val
+            return OciGenAiConfig(**oci_kwargs)
         raise ConversionError(  # pragma: no cover
             f"Unhandled OAS type: {oas_type}",
             component,

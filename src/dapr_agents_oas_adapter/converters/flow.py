@@ -802,8 +802,8 @@ class FlowConverter(ComponentConverter[Flow, WorkflowDefinition]):
                     # Normalize scalar results (e.g., str) so they can be mapped.
                     source_result = {"result": source_result}
 
-                # For end nodes without data_mapping, propagate all source results
-                if task.task_type == "end" and not edge.data_mapping:
+                # Without explicit data_mapping, propagate all source results
+                if not edge.data_mapping:
                     task_input.update(source_result)
                 else:
                     for source_key, dest_key in edge.data_mapping.items():

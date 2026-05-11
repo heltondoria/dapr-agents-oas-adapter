@@ -529,6 +529,67 @@ class TestLlmConfigConverter:
         result = converter.to_oas(config)
         assert result.default_generation_parameters is None
 
+    def test_from_oas_oci_genai_config(self) -> None:
+        """Test from_oas with OciGenAiConfig preserves OCI-specific fields."""
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "OciGenAiConfig"
+        mock_config.model_id = "cohere.command-r-plus"
+        mock_config.url = None
+        mock_config.compartment_id = "ocid1.compartment.oc1..abc"
+        mock_config.client_config = {"name": "api_key_config"}
+        mock_config.serving_mode = "ON_DEMAND"
+        mock_config.provider = None  # Not all OCI configs set this
+        mock_config.default_generation_parameters = None
+
+        result = converter.from_oas(mock_config)
+        assert result.provider == "oci"
+        assert result.model_name == "cohere.command-r-plus"
+        assert result.extra_params["compartment_id"] == "ocid1.compartment.oc1..abc"
+        assert result.extra_params["client_config"] == {"name": "api_key_config"}
+        assert "provider" not in result.extra_params  # None values are excluded
+
+    def test_to_oas_oci_genai(self) -> None:
+        """Test to_oas creates OciGenAiConfig with OCI-specific fields."""
+        from pyagentspec.llms import OciGenAiConfig
+        from pyagentspec.llms.ociclientconfig import OciClientConfigWithApiKey
+
+        converter = LlmConfigConverter()
+        client_config = OciClientConfigWithApiKey(
+            name="oci_key_config",
+            service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+            auth_profile="DEFAULT",
+            auth_file_location="~/.oci/config",
+        )
+        config = LlmProviderConfig(
+            provider="oci",
+            model_name="cohere.command-r-plus",
+            extra_params={
+                "compartment_id": "ocid1.compartment.oc1..abc",
+                "client_config": client_config,
+            },
+        )
+
+        result = converter.to_oas(config)
+        assert isinstance(result, OciGenAiConfig)
+        assert result.model_id == "cohere.command-r-plus"
+        assert result.compartment_id == "ocid1.compartment.oc1..abc"
+
+    def test_from_oas_temperature_zero_is_preserved(self) -> None:
+        """Test that temperature=0.0 is not silently replaced by 0.7."""
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "OpenAIConfig"
+        mock_config.model_id = "gpt-4"
+        mock_config.url = None
+        mock_config.api_key = "sk-test"
+        mock_config.default_generation_parameters = {"temperature": 0.0}
+
+        result = converter.from_oas(mock_config)
+        assert result.temperature == 0.0
+
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()
