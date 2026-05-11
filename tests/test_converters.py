@@ -443,6 +443,60 @@ class TestLlmConfigConverter:
         assert result.model_id == "llama2"
         assert result.url == "http://localhost:11434"
 
+    def test_from_oas_openai_compatible_config(self) -> None:
+        """Test from_oas with OpenAiCompatibleConfig."""
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "OpenAiCompatibleConfig"
+        mock_config.model_id = "local-llama"
+        mock_config.url = "http://localhost:8080/v1"
+        mock_config.api_key = "local-key"
+        mock_config.default_generation_parameters = None
+
+        result = converter.from_oas(mock_config)
+        assert result.provider == "openai_compatible"
+        assert result.model_name == "local-llama"
+        assert result.base_url == "http://localhost:8080/v1"
+        assert result.api_key == "local-key"
+
+    def test_from_oas_with_llm_generation_config(self) -> None:
+        """Test from_oas with LlmGenerationConfig (Pydantic model with model_dump)."""
+        from pyagentspec.llms import LlmGenerationConfig
+
+        converter = LlmConfigConverter()
+
+        mock_config = MagicMock()
+        mock_config.__class__.__name__ = "VllmConfig"
+        mock_config.model_id = "llama-3"
+        mock_config.url = None
+        mock_config.default_generation_parameters = LlmGenerationConfig(
+            temperature=0.9, max_tokens=2048, top_p=0.95
+        )
+
+        result = converter.from_oas(mock_config)
+        assert result.temperature == 0.9
+        assert result.max_tokens == 2048
+        assert result.extra_params == {"top_p": 0.95}
+
+    def test_to_oas_openai_compatible(self) -> None:
+        """Test to_oas creates OpenAiCompatibleConfig."""
+        converter = LlmConfigConverter()
+        config = LlmProviderConfig(
+            provider="openai_compatible",
+            model_name="local-model",
+            base_url="http://localhost:8080/v1",
+            api_key="test-key",
+        )
+
+        result = converter.to_oas(config)
+        from pyagentspec.llms import OpenAiCompatibleConfig
+
+        assert isinstance(result, OpenAiCompatibleConfig)
+        assert result.model_id == "local-model"
+        assert result.url == "http://localhost:8080/v1"
+        assert result.api_key == "test-key"
+
     def test_to_oas_unsupported_provider(self) -> None:
         """Test to_oas raises error for unsupported provider."""
         converter = LlmConfigConverter()

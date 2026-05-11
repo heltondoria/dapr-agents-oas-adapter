@@ -216,8 +216,10 @@ class TestMappings:
         """Test LLM provider mappings."""
         assert OAS_LLM_TO_DAPR_PROVIDER["VllmConfig"] == "vllm"
         assert OAS_LLM_TO_DAPR_PROVIDER["OpenAIConfig"] == "openai"
+        assert OAS_LLM_TO_DAPR_PROVIDER["OpenAiCompatibleConfig"] == "openai_compatible"
         assert DAPR_PROVIDER_TO_OAS_LLM["vllm"] == "VllmConfig"
         assert DAPR_PROVIDER_TO_OAS_LLM["openai"] == "OpenAIConfig"
+        assert DAPR_PROVIDER_TO_OAS_LLM["openai_compatible"] == "OpenAiCompatibleConfig"
 
     def test_json_schema_type_mappings(self) -> None:
         """Test JSON Schema type mappings."""
