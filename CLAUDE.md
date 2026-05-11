@@ -32,6 +32,11 @@ uv run ty check                       # Type check (local, fast feedback)
 uv run codespell .                # Spell check
 uv run vulture .                  # Dead code detection
 
+# Mutation Testing
+uv run mutmut run                 # Run mutation testing (full, ~6-10 min)
+uv run mutmut results             # View mutation score summary
+uv run mutmut show <id>           # Show specific surviving mutant
+
 # Documentation
 uv run mkdocs build               # Build documentation
 uv run mkdocs serve               # Serve docs locally at http://127.0.0.1:8000

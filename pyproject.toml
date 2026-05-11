@@ -27,6 +27,7 @@ Changelog = "https://github.com/heltondoria/dapr-agents-oas-adapter/releases"
 dev = [
     "codespell>=2.4.1",
     "hypothesis>=6.100.0",
+    "mutmut>=3.2.0",
     "pyright>=1.1.409",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
@@ -154,3 +155,8 @@ ignore-words-list = "crate,fo,nd,instale"
 paths = ["."]
 min_confidence = 90
 exclude = [".venv", "tests"]
+
+[tool.mutmut]
+paths_to_mutate = ["src/dapr_agents_oas_adapter/"]
+tests_dir = ["tests/"]
+pytest_add_cli_args = ["--ignore=tests/test_property_based.py"]

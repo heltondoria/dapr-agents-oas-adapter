@@ -93,3 +93,5 @@ prd_creator_assistant.md
 # Dapr runtime logs
 **/.dapr/logs/
 .dapr/logs/
+mutants/
+.mutmut-cache
