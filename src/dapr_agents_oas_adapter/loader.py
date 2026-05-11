@@ -273,7 +273,7 @@ class DaprAgentSpecLoader:
             additional_tools: Additional tool implementations to include
 
         Returns:
-            A Dapr Agent instance (AssistantAgent or ReActAgent)
+            A Dapr Agent instance (Agent or DurableAgent)
 
         Raises:
             ConversionError: If agent creation fails
@@ -590,7 +590,7 @@ class StrictLoader:
             additional_tools: Additional tool implementations to include
 
         Returns:
-            A Dapr Agent instance (AssistantAgent or ReActAgent)
+            A Dapr Agent instance (Agent or DurableAgent)
 
         Raises:
             ConversionError: If agent creation fails

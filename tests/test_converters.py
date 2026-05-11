@@ -1352,28 +1352,29 @@ class TestAgentConverter:
             agents_registry_store_name="registry",
             service_port=8000,
         )
-        object.__setattr__(config, "agent_type", DaprAgentType.ASSISTANT_AGENT.value)
+        object.__setattr__(config, "agent_type", DaprAgentType.AGENT.value)
 
         def search_func() -> str:
             return "result"
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         mock_tool_decorator = MagicMock(side_effect=lambda f: f)
 
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=mock_tool_decorator,
                 ),
             },
         ):
             result = converter.create_dapr_agent(config, {"search": search_func})
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
-    def test_create_dapr_agent_react_type(self) -> None:
-        """Test create_dapr_agent with ReActAgent type."""
+    def test_create_dapr_agent_legacy_react_type(self) -> None:
+        """Test create_dapr_agent with legacy ReActAgent type resolves to Agent."""
         converter = AgentConverter()
         config = DaprAgentConfig(
             name="react_agent",
@@ -1383,20 +1384,20 @@ class TestAgentConverter:
         )
         object.__setattr__(config, "agent_type", DaprAgentType.REACT_AGENT.value)
 
-        mock_react = MagicMock()
+        mock_agent_instance = MagicMock()
 
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(),
-                    ReActAgent=MagicMock(return_value=mock_react),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = converter.create_dapr_agent(config)
-            assert result is mock_react
+            assert result is mock_agent_instance
 
     def test_determine_agent_type_default(self) -> None:
         """Test _determine_agent_type returns default."""
@@ -1408,7 +1409,7 @@ class TestAgentConverter:
         mock_agent.system_prompt = ""
 
         result = converter._determine_agent_type(mock_agent)
-        assert result == DaprAgentType.ASSISTANT_AGENT
+        assert result == DaprAgentType.AGENT
 
     def test_determine_agent_type_from_metadata(self) -> None:
         """Test _determine_agent_type from metadata."""
@@ -1431,10 +1432,10 @@ class TestAgentConverter:
         mock_agent.system_prompt = ""
 
         result = converter._determine_agent_type(mock_agent)
-        assert result == DaprAgentType.ASSISTANT_AGENT
+        assert result == DaprAgentType.AGENT
 
-    def test_determine_agent_type_react_from_prompt(self) -> None:
-        """Test _determine_agent_type detects ReAct from system prompt."""
+    def test_determine_agent_type_with_tools_defaults_to_agent(self) -> None:
+        """Test _determine_agent_type defaults to Agent even with tools."""
         converter = AgentConverter()
 
         mock_agent = MagicMock()
@@ -1443,7 +1444,7 @@ class TestAgentConverter:
         mock_agent.system_prompt = "Please reason step by step and think carefully"
 
         result = converter._determine_agent_type(mock_agent)
-        assert result == DaprAgentType.REACT_AGENT
+        assert result == DaprAgentType.AGENT
 
     def test_extract_tools(self) -> None:
         """Test _extract_tools extracts tool definitions."""
@@ -1742,9 +1743,9 @@ class TestAgentConverter:
         mock_agent.tools = []
 
         # Empty string is not a valid DaprAgentType, so it should fall through
-        # to default logic (no tools = AssistantAgent)
+        # to default logic → Agent
         result = converter._determine_agent_type(mock_agent)
-        assert result == DaprAgentType.ASSISTANT_AGENT
+        assert result == DaprAgentType.AGENT
 
     def test_create_llm_client_openai(self) -> None:
         """Test _create_llm_client with OpenAI provider."""
@@ -1937,7 +1938,7 @@ class TestAgentConverter:
         dict_result = converter.to_dict(original_config)
         restored_config = converter.from_dict(dict_result)
 
-        # None should be preserved, not converted to "AssistantAgent"
+        # None should be preserved, not converted to "Agent"
         assert restored_config.agent_type is None
 
     def test_from_dict_preserves_empty_string_values(self) -> None:
@@ -2099,10 +2100,10 @@ class TestAgentConverter:
         config = DaprAgentConfig(
             name="exception_test",
             role="Tester",
-            agent_type="AssistantAgent",
+            agent_type="Agent",
         )
 
-        # Mock AssistantAgent to raise a generic exception
+        # Mock Agent to raise a generic exception
         with patch.dict(
             "sys.modules",
             {"dapr_agents": MagicMock()},
@@ -2110,7 +2111,7 @@ class TestAgentConverter:
             import sys
 
             mock_module = sys.modules["dapr_agents"]
-            mock_module.AssistantAgent.side_effect = RuntimeError("Test error")
+            mock_module.Agent.side_effect = RuntimeError("Test error")
 
             with pytest.raises(ConversionError) as exc_info:
                 converter.create_dapr_agent(config)

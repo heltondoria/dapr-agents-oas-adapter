@@ -194,7 +194,7 @@ class DaprAgentSpecExporter:
         """Extract configuration from a Dapr Agent instance.
 
         Args:
-            agent: A Dapr Agent instance (AssistantAgent, ReActAgent, etc.)
+            agent: A Dapr Agent instance (Agent or DurableAgent)
 
         Returns:
             DaprAgentConfig with the agent's configuration

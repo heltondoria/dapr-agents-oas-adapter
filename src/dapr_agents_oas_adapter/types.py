@@ -50,7 +50,13 @@ class OASComponentType(StrEnum):
 
 
 class DaprAgentType(StrEnum):
-    """Dapr Agents agent types."""
+    """Dapr Agents agent types.
+
+    As of dapr-agents 0.13.0, only ``Agent`` and ``DurableAgent`` exist.
+    ``ASSISTANT_AGENT`` and ``REACT_AGENT`` are kept as aliases that resolve
+    to ``Agent`` at runtime, so that existing serialised configs round-trip
+    without error.
+    """
 
     AGENT = "Agent"
     ASSISTANT_AGENT = "AssistantAgent"
@@ -210,8 +216,10 @@ class DaprAgentConfig(BaseModel):
 
 # Component type mappings
 OAS_TO_DAPR_AGENT_TYPE: dict[str, DaprAgentType] = {
-    "Agent": DaprAgentType.ASSISTANT_AGENT,
-    "ReActAgent": DaprAgentType.REACT_AGENT,
+    "Agent": DaprAgentType.AGENT,
+    # Legacy aliases kept for backward compatibility with serialised configs
+    "AssistantAgent": DaprAgentType.AGENT,
+    "ReActAgent": DaprAgentType.AGENT,
 }
 
 DAPR_TO_OAS_AGENT_TYPE: dict[DaprAgentType, str] = {

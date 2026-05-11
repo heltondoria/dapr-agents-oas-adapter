@@ -203,8 +203,9 @@ class TestMappings:
 
     def test_oas_to_dapr_agent_type(self) -> None:
         """Test OAS to Dapr agent type mapping."""
-        assert OAS_TO_DAPR_AGENT_TYPE["Agent"] == DaprAgentType.ASSISTANT_AGENT
-        assert OAS_TO_DAPR_AGENT_TYPE["ReActAgent"] == DaprAgentType.REACT_AGENT
+        assert OAS_TO_DAPR_AGENT_TYPE["Agent"] == DaprAgentType.AGENT
+        assert OAS_TO_DAPR_AGENT_TYPE["AssistantAgent"] == DaprAgentType.AGENT
+        assert OAS_TO_DAPR_AGENT_TYPE["ReActAgent"] == DaprAgentType.AGENT
 
     def test_dapr_to_oas_agent_type(self) -> None:
         """Test Dapr to OAS agent type mapping."""
