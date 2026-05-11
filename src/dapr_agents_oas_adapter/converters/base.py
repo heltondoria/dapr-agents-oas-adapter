@@ -17,7 +17,7 @@ class ComponentConverter[OASType: Component, DaprType](ABC):
 
     Type Parameters:
         OASType: The OAS component type (e.g., Agent, Tool, Flow)
-        DaprType: The Dapr Agents type (e.g., AssistantAgent, Callable, Workflow)
+        DaprType: The Dapr Agents type (e.g., Agent, Callable, Workflow)
     """
 
     def __init__(self, tool_registry: ToolRegistry | None = None) -> None:

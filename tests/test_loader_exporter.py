@@ -305,18 +305,19 @@ agentspec_version: "25.4.1"
             tools=[],
         )
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = loader.create_agent(config)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_create_agent_with_additional_tools(self) -> None:
         """Test create_agent with additional tools."""
@@ -330,18 +331,19 @@ agentspec_version: "25.4.1"
             tools=["extra_tool"],
         )
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = loader.create_agent(config, additional_tools={"extra_tool": extra_tool})
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_create_workflow(self) -> None:
         """Test create_workflow creates workflow function."""
@@ -414,18 +416,19 @@ agentspec_version: "25.4.1"
             "agentspec_version": "25.4.1"
         }"""
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = loader.load_and_create_agent(json_content, is_yaml=False)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_load_and_create_agent_yaml(self) -> None:
         """Test load_and_create_agent with YAML."""
@@ -449,18 +452,19 @@ outputs: []
 agentspec_version: "25.4.1"
 """
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = loader.load_and_create_agent(yaml_content, is_yaml=True)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_load_and_create_agent_wrong_type(self) -> None:
         """Test load_dict returns correct type for Flow."""
@@ -1482,18 +1486,19 @@ agentspec_version: "25.4.1"
             tools=[],
         )
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = loader.create_agent(config)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_create_workflow_delegates_to_loader(self) -> None:
         """Test create_workflow delegates to underlying loader."""

@@ -305,18 +305,19 @@ class TestAgentConversionPipeline:
         config = loader.load_dict(SIMPLE_AGENT_DICT)
         assert isinstance(config, DaprAgentConfig)
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             agent = loader.create_agent(config)
-            assert agent is mock_assistant
+            assert agent is mock_agent_instance
 
 
 class TestWorkflowConversionPipeline:

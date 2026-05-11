@@ -26,8 +26,8 @@ from dapr_agents_oas_adapter.utils import (
 class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
     """Converter for OAS Agent <-> Dapr Agent configuration.
 
-    Supports conversion between OAS Agent and various Dapr Agent types
-    (AssistantAgent, ReActAgent, DurableAgent).
+    Supports conversion between OAS Agent and Dapr Agent types
+    (Agent, DurableAgent).
     """
 
     def __init__(self, tool_registry: ToolRegistry | None = None) -> None:
@@ -340,18 +340,22 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
 
         This method creates the actual Dapr Agent object that can be started.
 
+        As of dapr-agents 0.13.0, the available agent classes are ``Agent``
+        (standalone) and ``DurableAgent`` (workflow-backed).  The legacy
+        ``AssistantAgent`` and ``ReActAgent`` types are treated as ``Agent``.
+
         Args:
             config: The agent configuration
             tool_implementations: Optional tool implementations
 
         Returns:
-            A Dapr Agent instance (AssistantAgent, ReActAgent, or DurableAgent)
+            A Dapr Agent instance (Agent or DurableAgent)
 
         Raises:
             ConversionError: If agent creation fails
         """
         try:
-            from dapr_agents import AssistantAgent  # type: ignore[reportAttributeAccessIssue]
+            from dapr_agents import Agent as DaprAgent
             from dapr_agents import tool as dapr_tool
 
             # Merge tool registries
@@ -370,17 +374,8 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     decorated_tools.append(func)
 
             # Determine agent class
-            agent_type = config.agent_type or DaprAgentType.ASSISTANT_AGENT.value
+            agent_type = config.agent_type or DaprAgentType.AGENT.value
 
-            if agent_type == DaprAgentType.REACT_AGENT.value:
-                from dapr_agents import ReActAgent  # type: ignore[reportAttributeAccessIssue]
-
-                return ReActAgent(
-                    name=config.name,
-                    role=config.role or config.name,
-                    instructions=config.instructions,
-                    tools=decorated_tools,
-                )
             if agent_type == DaprAgentType.DURABLE_AGENT.value:
                 from dapr_agents import DurableAgent
                 from dapr_agents.agents.configs import (
@@ -470,16 +465,17 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
                     durable_agent_kwargs["registry"] = registry_config
 
                 return DurableAgent(**durable_agent_kwargs)
-            return AssistantAgent(
+
+            # Default: create a standalone Agent (handles Agent, AssistantAgent,
+            # ReActAgent legacy types).
+            llm_client = self._create_llm_client(config.llm_config)
+            return DaprAgent(
                 name=config.name,
                 role=config.role or config.name,
                 goal=config.goal,
                 instructions=config.instructions,
                 tools=decorated_tools,
-                message_bus_name=config.message_bus_name,
-                state_store_name=config.state_store_name,
-                agents_registry_store_name=config.agents_registry_store_name,
-                service_port=config.service_port,
+                llm=llm_client,
             )
 
         except ImportError as e:
@@ -561,16 +557,10 @@ class AgentConverter(ComponentConverter[OASAgent, DaprAgentConfig]):
             if any(key in component.metadata for key in durable_agent_keys):
                 return DaprAgentType.DURABLE_AGENT
 
-        # Check if agent has tools (suggests ReActAgent)
-        tools = getattr(component, "tools", [])
-        if tools and len(tools) > 0:
-            # Agents with tools that need reasoning -> ReActAgent
-            system_prompt = getattr(component, "system_prompt", "") or ""
-            if "reason" in system_prompt.lower() or "think" in system_prompt.lower():
-                return DaprAgentType.REACT_AGENT
-
-        # Default to AssistantAgent
-        return DaprAgentType.ASSISTANT_AGENT
+        # Default to Agent (standalone).
+        # In dapr-agents 0.13.0, Agent handles both tool-equipped and
+        # conversational use cases — no separate ReActAgent/AssistantAgent.
+        return DaprAgentType.AGENT
 
     def _extract_tools(self, component: OASAgent) -> list[ToolDefinition]:
         """Extract tool definitions from an OAS Agent."""

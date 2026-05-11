@@ -1048,18 +1048,19 @@ class TestBranchPartialCoverage:
             tools=["missing_tool"],  # Not in any registry
         )
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=MagicMock(side_effect=lambda f: f),
                 ),
             },
         ):
             result = converter.create_dapr_agent(config)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
 
     def test_create_agent_already_decorated_tool(self) -> None:
         """Verify create_agent skips @tool for already-decorated funcs (agent.py:368->370)."""
@@ -1076,19 +1077,20 @@ class TestBranchPartialCoverage:
             tools=["my_tool"],
         )
 
-        mock_assistant = MagicMock()
+        mock_agent_instance = MagicMock()
         mock_dapr_tool = MagicMock(side_effect=lambda f: f)
         with patch.dict(
             "sys.modules",
             {
                 "dapr_agents": MagicMock(
-                    AssistantAgent=MagicMock(return_value=mock_assistant),
+                    Agent=MagicMock(return_value=mock_agent_instance),
+                    OpenAIChatClient=MagicMock(),
                     tool=mock_dapr_tool,
                 ),
             },
         ):
             result = converter.create_dapr_agent(config)
-            assert result is mock_assistant
+            assert result is mock_agent_instance
             # @tool decorator should NOT be called because _is_dapr_tool exists
             mock_dapr_tool.assert_not_called()
 
