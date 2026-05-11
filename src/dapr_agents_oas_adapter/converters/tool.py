@@ -164,12 +164,7 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         transport_config = None
         if tool_dict.get("component_type") == "MCPTool":
             client_transport = tool_dict.get("client_transport", {})
-            transport_config = {
-                "type": client_transport.get("component_type", "SSETransport"),
-                "url": client_transport.get("url"),
-                "headers": client_transport.get("headers"),
-                "session_parameters": client_transport.get("session_parameters"),
-            }
+            transport_config = self._parse_transport_dict(client_transport)
 
         return ToolDefinition(
             name=name,
@@ -192,18 +187,9 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         # Export as MCPTool if there's transport config
         if tool_def.transport_config:
             transport = tool_def.transport_config
-            client_transport: dict[str, Any] = {
-                "component_type": transport.get("type", "SSETransport"),
-                "id": generate_id("transport"),
-                "name": f"{tool_def.name}_transport",
-            }
-            # Add optional transport fields (use 'is not None' to preserve empty values)
-            if transport.get("url") is not None:
-                client_transport["url"] = transport["url"]
-            if transport.get("headers") is not None:
-                client_transport["headers"] = transport["headers"]
-            if transport.get("session_parameters") is not None:
-                client_transport["session_parameters"] = transport["session_parameters"]
+            client_transport = self._build_transport_dict(
+                transport, name=f"{tool_def.name}_transport"
+            )
 
             return {
                 "component_type": "MCPTool",
@@ -315,6 +301,61 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
 
         return [{"title": "result", "type": json_type}]
 
+    # Transport field sets used by _parse_transport_dict / _build_transport_dict
+    _URL_TRANSPORT_KEYS = ("url", "headers", "sensitive_headers", "session_parameters")
+    _MTLS_KEYS = ("key_file", "cert_file", "ca_file")
+    _STDIO_KEYS = ("command", "args", "env", "cwd")
+
+    @staticmethod
+    def _parse_transport_dict(raw: dict[str, Any]) -> dict[str, Any]:
+        """Parse a transport dict from OAS/dict representation into internal format."""
+        config: dict[str, Any] = {
+            "type": raw.get("component_type", "SSETransport"),
+        }
+        # Copy all known transport fields that are present
+        for key in (
+            "url",
+            "headers",
+            "sensitive_headers",
+            "session_parameters",
+            "key_file",
+            "cert_file",
+            "ca_file",
+            "command",
+            "args",
+            "env",
+            "cwd",
+        ):
+            if key in raw:
+                config[key] = raw[key]
+        return config
+
+    @staticmethod
+    def _build_transport_dict(transport: dict[str, Any], name: str) -> dict[str, Any]:
+        """Build an OAS-style transport dict from internal transport_config."""
+        result: dict[str, Any] = {
+            "component_type": transport.get("type", "SSETransport"),
+            "id": generate_id("transport"),
+            "name": name,
+        }
+        # Emit all known transport fields (use 'is not None' to preserve empty values)
+        for key in (
+            "url",
+            "headers",
+            "sensitive_headers",
+            "session_parameters",
+            "key_file",
+            "cert_file",
+            "ca_file",
+            "command",
+            "args",
+            "env",
+            "cwd",
+        ):
+            if transport.get(key) is not None:
+                result[key] = transport[key]
+        return result
+
     def _build_annotations_from_schema(self, inputs: list[PropertySchema]) -> dict[str, type]:
         """Build Python annotations from JSON Schema properties."""
         from dapr_agents_oas_adapter.utils import json_schema_to_python_type
@@ -359,8 +400,13 @@ class MCPToolConverter(ToolConverter):
     def _extract_transport_config(self, transport: Any) -> dict[str, Any]:
         """Extract MCP transport configuration.
 
+        Handles all pyagentspec 26.1.0 transport types:
+        - SSETransport / StreamableHTTPTransport (url, headers, sensitive_headers)
+        - SSEmTLSTransport / StreamableHTTPmTLSTransport (+ key_file, cert_file, ca_file)
+        - StdioTransport (command, args, env, cwd)
+
         Args:
-            transport: The transport object (SSETransport, etc.)
+            transport: The transport object
 
         Returns:
             Dictionary with transport configuration
@@ -373,11 +419,34 @@ class MCPToolConverter(ToolConverter):
             transport_type = type(transport).__name__
         config["type"] = transport_type
 
+        # Common field
+        if hasattr(transport, "session_parameters"):
+            config["session_parameters"] = transport.session_parameters
+
+        # URL-based transports (SSE, StreamableHTTP, and their mTLS variants)
         if hasattr(transport, "url"):
             config["url"] = transport.url
         if hasattr(transport, "headers"):
             config["headers"] = transport.headers
-        if hasattr(transport, "session_parameters"):
-            config["session_parameters"] = transport.session_parameters
+        if hasattr(transport, "sensitive_headers"):
+            config["sensitive_headers"] = transport.sensitive_headers
+
+        # mTLS certificate fields
+        if hasattr(transport, "key_file"):
+            config["key_file"] = transport.key_file
+        if hasattr(transport, "cert_file"):
+            config["cert_file"] = transport.cert_file
+        if hasattr(transport, "ca_file"):
+            config["ca_file"] = transport.ca_file
+
+        # StdioTransport fields
+        if hasattr(transport, "command"):
+            config["command"] = transport.command
+        if hasattr(transport, "args"):
+            config["args"] = transport.args
+        if hasattr(transport, "env"):
+            config["env"] = transport.env
+        if hasattr(transport, "cwd"):
+            config["cwd"] = transport.cwd
 
         return config

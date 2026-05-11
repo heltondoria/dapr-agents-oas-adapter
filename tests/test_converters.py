@@ -1109,6 +1109,143 @@ class TestMCPToolConverter:
         assert result["client_transport"]["headers"] == {}
         assert result["client_transport"]["session_parameters"] == {}
 
+    def test_roundtrip_stdio_transport(self) -> None:
+        """Test round-trip for StdioTransport preserves command, args, env, cwd."""
+        converter = ToolConverter()
+
+        original = {
+            "component_type": "MCPTool",
+            "name": "stdio_tool",
+            "description": "Local MCP via stdio",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {
+                "component_type": "StdioTransport",
+                "command": "npx",
+                "args": ["-y", "@mcp/server-fs"],
+                "env": {"HOME": "/home/user"},
+                "cwd": "/workspace",
+            },
+        }
+
+        tool_def = converter.from_dict(original)
+        assert tool_def.transport_config is not None
+        assert tool_def.transport_config["type"] == "StdioTransport"
+        assert tool_def.transport_config["command"] == "npx"
+        assert tool_def.transport_config["args"] == ["-y", "@mcp/server-fs"]
+        assert tool_def.transport_config["env"] == {"HOME": "/home/user"}
+        assert tool_def.transport_config["cwd"] == "/workspace"
+
+        result = converter.to_dict(tool_def)
+        assert result["client_transport"]["component_type"] == "StdioTransport"
+        assert result["client_transport"]["command"] == "npx"
+        assert result["client_transport"]["args"] == ["-y", "@mcp/server-fs"]
+        assert result["client_transport"]["env"] == {"HOME": "/home/user"}
+        assert result["client_transport"]["cwd"] == "/workspace"
+
+    def test_roundtrip_mtls_transport(self) -> None:
+        """Test round-trip for SSEmTLSTransport preserves certificate fields."""
+        converter = ToolConverter()
+
+        original = {
+            "component_type": "MCPTool",
+            "name": "secure_tool",
+            "description": "MCP over mTLS",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {
+                "component_type": "SSEmTLSTransport",
+                "url": "https://mcp.internal:8443/sse",
+                "headers": {"X-Tenant": "acme"},
+                "sensitive_headers": ["Authorization"],
+                "key_file": "/certs/client.key",
+                "cert_file": "/certs/client.crt",
+                "ca_file": "/certs/ca.crt",
+            },
+        }
+
+        tool_def = converter.from_dict(original)
+        tc = tool_def.transport_config
+        assert tc is not None
+        assert tc["type"] == "SSEmTLSTransport"
+        assert tc["key_file"] == "/certs/client.key"
+        assert tc["cert_file"] == "/certs/client.crt"
+        assert tc["ca_file"] == "/certs/ca.crt"
+        assert tc["sensitive_headers"] == ["Authorization"]
+
+        result = converter.to_dict(tool_def)
+        ct = result["client_transport"]
+        assert ct["component_type"] == "SSEmTLSTransport"
+        assert ct["key_file"] == "/certs/client.key"
+        assert ct["cert_file"] == "/certs/client.crt"
+        assert ct["ca_file"] == "/certs/ca.crt"
+        assert ct["sensitive_headers"] == ["Authorization"]
+
+    def test_roundtrip_streamable_http_mtls_transport(self) -> None:
+        """Test round-trip for StreamableHTTPmTLSTransport."""
+        converter = ToolConverter()
+
+        original = {
+            "component_type": "MCPTool",
+            "name": "http_mtls_tool",
+            "description": "MCP over streamable HTTP with mTLS",
+            "inputs": [],
+            "outputs": [],
+            "client_transport": {
+                "component_type": "StreamableHTTPmTLSTransport",
+                "url": "https://mcp.internal:9443/http",
+                "key_file": "/certs/key.pem",
+                "cert_file": "/certs/cert.pem",
+                "ca_file": "/certs/ca.pem",
+            },
+        }
+
+        tool_def = converter.from_dict(original)
+        result = converter.to_dict(tool_def)
+        ct = result["client_transport"]
+        assert ct["component_type"] == "StreamableHTTPmTLSTransport"
+        assert ct["url"] == "https://mcp.internal:9443/http"
+        assert ct["key_file"] == "/certs/key.pem"
+
+    def test_extract_transport_config_stdio(self) -> None:
+        """Test _extract_transport_config with StdioTransport-like object."""
+        converter = MCPToolConverter()
+
+        mock_transport = MagicMock()
+        mock_transport.command = "python"
+        mock_transport.args = ["-m", "mcp_server"]
+        mock_transport.env = {"DEBUG": "1"}
+        mock_transport.cwd = "/app"
+        # No url/headers for stdio
+        del mock_transport.url
+        del mock_transport.headers
+        del mock_transport.sensitive_headers
+
+        result = converter._extract_transport_config(mock_transport)
+        assert result["command"] == "python"
+        assert result["args"] == ["-m", "mcp_server"]
+        assert result["env"] == {"DEBUG": "1"}
+        assert result["cwd"] == "/app"
+        assert "url" not in result
+
+    def test_extract_transport_config_mtls(self) -> None:
+        """Test _extract_transport_config with mTLS transport fields."""
+        converter = MCPToolConverter()
+
+        mock_transport = MagicMock()
+        mock_transport.url = "https://secure:8443"
+        mock_transport.headers = {}
+        mock_transport.sensitive_headers = ["Authorization"]
+        mock_transport.key_file = "/certs/client.key"
+        mock_transport.cert_file = "/certs/client.crt"
+        mock_transport.ca_file = "/certs/ca.crt"
+
+        result = converter._extract_transport_config(mock_transport)
+        assert result["sensitive_headers"] == ["Authorization"]
+        assert result["key_file"] == "/certs/client.key"
+        assert result["cert_file"] == "/certs/client.crt"
+        assert result["ca_file"] == "/certs/ca.crt"
+
     def test_from_dict_server_tool_no_mcp_transport(self) -> None:
         """Test from_dict with ServerTool has no mcp_transport."""
         converter = ToolConverter()
