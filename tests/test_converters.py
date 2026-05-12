@@ -2588,7 +2588,7 @@ class TestNodeConverter:
         assert result.config.get("prompt_template") == "Answer: {{question}}"
 
     def test_from_dict_tool_node(self) -> None:
-        """Test from_dict for tool node."""
+        """Test from_dict for tool node preserves inputs/outputs."""
         converter = NodeConverter()
         node_dict = {
             "component_type": "ToolNode",
@@ -2599,6 +2599,8 @@ class TestNodeConverter:
         result = converter.from_dict(node_dict)
         assert result.name == "call_api"
         assert result.task_type == "tool"
+        assert result.inputs == ["endpoint"]
+        assert result.outputs == ["response"]
 
     def test_from_dict_with_tool_config(self) -> None:
         """Test from_dict for tool node with tool configuration."""
@@ -2628,7 +2630,7 @@ class TestNodeConverter:
         assert result.config.get("llm_config") == {"model": "gpt-4", "temperature": 0.7}
 
     def test_from_dict_start_node(self) -> None:
-        """Test from_dict for StartNode."""
+        """Test from_dict for StartNode preserves inputs and outputs."""
         converter = NodeConverter()
         node_dict = {
             "component_type": "StartNode",
@@ -2639,9 +2641,11 @@ class TestNodeConverter:
         result = converter.from_dict(node_dict)
         assert result.name == "start"
         assert result.task_type == "start"
+        assert result.inputs == ["input"]
+        assert result.outputs == ["input"]
 
     def test_from_dict_end_node(self) -> None:
-        """Test from_dict for EndNode."""
+        """Test from_dict for EndNode preserves inputs and outputs."""
         converter = NodeConverter()
         node_dict = {
             "component_type": "EndNode",
@@ -2652,6 +2656,8 @@ class TestNodeConverter:
         result = converter.from_dict(node_dict)
         assert result.name == "end"
         assert result.task_type == "end"
+        assert result.inputs == ["result"]
+        assert result.outputs == ["result"]
 
     def test_from_dict_agent_node(self) -> None:
         """Test from_dict for AgentNode."""
@@ -2659,11 +2665,14 @@ class TestNodeConverter:
         node_dict = {
             "component_type": "AgentNode",
             "name": "agent_call",
-            "inputs": [],
-            "outputs": [],
+            "inputs": [{"title": "query", "type": "string"}],
+            "outputs": [{"title": "answer", "type": "string"}],
         }
         result = converter.from_dict(node_dict)
+        assert result.name == "agent_call"
         assert result.task_type == "agent"
+        assert result.inputs == ["query"]
+        assert result.outputs == ["answer"]
 
     def test_from_dict_flow_node(self) -> None:
         """Test from_dict for FlowNode."""
@@ -2671,11 +2680,14 @@ class TestNodeConverter:
         node_dict = {
             "component_type": "FlowNode",
             "name": "sub_flow",
-            "inputs": [],
+            "inputs": [{"title": "data", "type": "object"}],
             "outputs": [],
         }
         result = converter.from_dict(node_dict)
+        assert result.name == "sub_flow"
         assert result.task_type == "flow"
+        assert result.inputs == ["data"]
+        assert result.outputs == []
 
     def test_from_dict_map_node(self) -> None:
         """Test from_dict for MapNode."""
@@ -2683,11 +2695,14 @@ class TestNodeConverter:
         node_dict = {
             "component_type": "MapNode",
             "name": "parallel_map",
-            "inputs": [],
-            "outputs": [],
+            "inputs": [{"title": "items", "type": "array"}],
+            "outputs": [{"title": "results", "type": "array"}],
         }
         result = converter.from_dict(node_dict)
+        assert result.name == "parallel_map"
         assert result.task_type == "map"
+        assert result.inputs == ["items"]
+        assert result.outputs == ["results"]
 
     def test_from_dict_unknown_node(self) -> None:
         """Test from_dict defaults to llm for unknown node type."""
@@ -2702,7 +2717,7 @@ class TestNodeConverter:
         assert result.task_type == "llm"  # Default
 
     def test_to_dict(self) -> None:
-        """Test to_dict conversion."""
+        """Test to_dict preserves all task fields in output dict."""
         converter = NodeConverter()
         task = WorkflowTaskDefinition(
             name="process",
@@ -2714,6 +2729,10 @@ class TestNodeConverter:
         result = converter.to_dict(task)
         assert result["component_type"] == "LlmNode"
         assert result["name"] == "process"
+        assert result["prompt_template"] == "Process {{data}}"
+        assert "id" in result
+        assert result["inputs"] == [{"title": "data", "type": "string"}]
+        assert result["outputs"] == [{"title": "result", "type": "string"}]
 
     def test_to_dict_with_llm_config(self) -> None:
         """Test to_dict includes llm_config for llm tasks."""
@@ -2744,32 +2763,47 @@ class TestNodeConverter:
         assert result["tool"] == {"name": "calculator"}
 
     def test_to_dict_start_type(self) -> None:
-        """Test to_dict for start task type."""
+        """Test to_dict for start task type includes name and id."""
         converter = NodeConverter()
-        task = WorkflowTaskDefinition(name="start", task_type="start")
+        task = WorkflowTaskDefinition(name="begin", task_type="start")
         result = converter.to_dict(task)
         assert result["component_type"] == "StartNode"
+        assert result["name"] == "begin"
+        assert "id" in result
 
     def test_to_dict_end_type(self) -> None:
-        """Test to_dict for end task type."""
+        """Test to_dict for end task type includes name and id."""
         converter = NodeConverter()
-        task = WorkflowTaskDefinition(name="end", task_type="end")
+        task = WorkflowTaskDefinition(name="finish", task_type="end")
         result = converter.to_dict(task)
         assert result["component_type"] == "EndNode"
+        assert result["name"] == "finish"
+        assert "id" in result
 
     def test_to_dict_agent_type(self) -> None:
         """Test to_dict for agent task type."""
         converter = NodeConverter()
-        task = WorkflowTaskDefinition(name="agent", task_type="agent")
+        task = WorkflowTaskDefinition(
+            name="agent_task",
+            task_type="agent",
+        )
         result = converter.to_dict(task)
         assert result["component_type"] == "AgentNode"
+        assert result["name"] == "agent_task"
+        assert "id" in result
 
     def test_to_dict_flow_type(self) -> None:
-        """Test to_dict for flow task type."""
+        """Test to_dict for flow task type creates subflow component ref."""
         converter = NodeConverter()
-        task = WorkflowTaskDefinition(name="flow", task_type="flow")
+        task = WorkflowTaskDefinition(
+            name="sub_flow",
+            task_type="flow",
+            config={"flow_id": "child_1"},
+        )
         result = converter.to_dict(task)
         assert result["component_type"] == "FlowNode"
+        assert result["name"] == "sub_flow"
+        assert result["subflow"] == {"$component_ref": "child_1"}
 
     def test_to_dict_map_type(self) -> None:
         """Test to_dict for map task type."""
@@ -2966,26 +3000,42 @@ class TestNodeConverter:
         assert result.task_type == "map"
 
     def test_extract_node_config_llm(self) -> None:
-        """Test _extract_node_config for LLM node type directly."""
-        # Import from the converter module which has fallbacks
+        """Test _extract_node_config extracts prompt_template from LLM node."""
         from dapr_agents_oas_adapter.converters.node import LlmNode
 
         converter = NodeConverter()
 
-        # Create a mock that will pass isinstance(node, LlmNode)
         mock_node = MagicMock()
         mock_node.__class__ = LlmNode
-        mock_node.prompt_template = "Test prompt"
+        mock_node.prompt_template = "Process: {{input}}"
         mock_node.llm_config = None
+        mock_node.metadata = None
 
-        # Call the private method directly
         config = converter._extract_node_config(mock_node)
-        # The isinstance check uses the imported LlmNode which might be Component
-        # So we just verify the method doesn't crash
         assert isinstance(config, dict)
+        assert config["prompt_template"] == "Process: {{input}}"
+        assert "llm_config" not in config  # None llm_config should not produce key
+
+    def test_extract_node_config_llm_with_llm_config(self) -> None:
+        """Test _extract_node_config extracts llm_config when present."""
+        from dapr_agents_oas_adapter.converters.node import LlmNode
+
+        converter = NodeConverter()
+
+        mock_node = MagicMock()
+        mock_node.__class__ = LlmNode
+        mock_node.prompt_template = "Hello"
+        mock_llm = MagicMock()
+        mock_llm.model_dump.return_value = {"model": "gpt-4"}
+        mock_node.llm_config = mock_llm
+        mock_node.metadata = None
+
+        config = converter._extract_node_config(mock_node)
+        assert config["prompt_template"] == "Hello"
+        assert "llm_config" in config
 
     def test_extract_node_config_tool(self) -> None:
-        """Test _extract_node_config for Tool node type directly."""
+        """Test _extract_node_config extracts tool name and serialized tool."""
         from dapr_agents_oas_adapter.converters.node import ToolNode
 
         converter = NodeConverter()
@@ -2996,12 +3046,15 @@ class TestNodeConverter:
         mock_tool.name = "my_tool"
         mock_tool.model_dump.return_value = {"name": "my_tool"}
         mock_node.tool = mock_tool
+        mock_node.metadata = None
 
         config = converter._extract_node_config(mock_node)
         assert isinstance(config, dict)
+        assert config["tool_name"] == "my_tool"
+        assert "tool" in config
 
     def test_extract_node_config_agent(self) -> None:
-        """Test _extract_node_config for Agent node type directly."""
+        """Test _extract_node_config extracts agent_config."""
         from dapr_agents_oas_adapter.converters.node import AgentNode
 
         converter = NodeConverter()
@@ -3011,12 +3064,14 @@ class TestNodeConverter:
         mock_agent = MagicMock()
         mock_agent.model_dump.return_value = {"name": "assistant"}
         mock_node.agent = mock_agent
+        mock_node.metadata = None
 
         config = converter._extract_node_config(mock_node)
         assert isinstance(config, dict)
+        assert "agent_config" in config
 
     def test_extract_node_config_flow(self) -> None:
-        """Test _extract_node_config for Flow node type directly."""
+        """Test _extract_node_config extracts flow_id and flow_name."""
         from dapr_agents_oas_adapter.converters.node import FlowNode
 
         converter = NodeConverter()
@@ -3027,12 +3082,15 @@ class TestNodeConverter:
         mock_flow.id = "flow_123"
         mock_flow.name = "sub_flow"
         mock_node.flow = mock_flow
+        mock_node.metadata = None
 
         config = converter._extract_node_config(mock_node)
         assert isinstance(config, dict)
+        assert config["flow_id"] == "flow_123"
+        assert config["flow_name"] == "sub_flow"
 
     def test_extract_node_config_map(self) -> None:
-        """Test _extract_node_config for Map node type directly."""
+        """Test _extract_node_config extracts parallel flag and inner_flow_id."""
         from dapr_agents_oas_adapter.converters.node import MapNode
 
         converter = NodeConverter()
@@ -3043,9 +3101,12 @@ class TestNodeConverter:
         mock_inner = MagicMock()
         mock_inner.id = "inner_123"
         mock_node.inner_flow = mock_inner
+        mock_node.metadata = None
 
         config = converter._extract_node_config(mock_node)
         assert isinstance(config, dict)
+        assert config["parallel"] is True
+        assert config["inner_flow_id"] == "inner_123"
 
     def test_can_convert_node(self) -> None:
         """Test can_convert with Node-like objects."""
