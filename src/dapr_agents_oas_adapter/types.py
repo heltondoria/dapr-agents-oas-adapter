@@ -40,6 +40,10 @@ class OASComponentType(StrEnum):
     SERVER_TOOL = "ServerTool"
     REMOTE_TOOL = "RemoteTool"
     MCP_TOOL = "MCPTool"
+    BUILTIN_TOOL = "BuiltinTool"
+    CLIENT_TOOL = "ClientTool"
+    TOOL_BOX = "ToolBox"
+    MCP_TOOL_BOX = "MCPToolBox"
     CONTROL_FLOW_EDGE = "ControlFlowEdge"
     DATA_FLOW_EDGE = "DataFlowEdge"
     # LLM Config types
