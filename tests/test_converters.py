@@ -3405,9 +3405,22 @@ class TestFlowConverter:
         assert result.name == "my_workflow"
         assert result.description == "A test workflow"
         assert len(result.tasks) == 2
+        # Verify task types and names were correctly converted
+        task_names = {t.name for t in result.tasks}
+        assert task_names == {"start", "end"}
+        start_task = next(t for t in result.tasks if t.name == "start")
+        assert start_task.task_type == "start"
+        end_task = next(t for t in result.tasks if t.name == "end")
+        assert end_task.task_type == "end"
+        # Verify edge connectivity
+        assert len(result.edges) == 1
+        assert result.edges[0].from_node == "start"
+        assert result.edges[0].to_node == "end"
+        # Verify start_node was identified
+        assert result.start_node == "start"
 
     def test_from_dict_with_data_flow_connections(self) -> None:
-        """Test from_dict with data flow connections."""
+        """Test from_dict with data flow connections merges data mappings."""
         converter = FlowConverter()
         flow_dict = {
             "component_type": "Flow",
@@ -3433,9 +3446,13 @@ class TestFlowConverter:
         }
         result = converter.from_dict(flow_dict)
         assert len(result.edges) == 2
-        # Check that data mapping was merged
+        assert len(result.tasks) == 3
+        # Verify task types
+        task_types = {t.name: t.task_type for t in result.tasks}
+        assert task_types == {"start": "start", "process": "llm", "end": "end"}
+        # Check that data mapping was merged correctly
         edge_to_process = next(e for e in result.edges if e.to_node == "process")
-        assert edge_to_process.data_mapping.get("input") == "query"
+        assert edge_to_process.data_mapping == {"input": "query"}
 
     def test_from_dict_with_component_refs(self) -> None:
         """Test from_dict with $component_ref and $referenced_components."""
@@ -3459,6 +3476,8 @@ class TestFlowConverter:
         assert result.name == "ref_test"
         assert len(result.tasks) == 2
         assert result.start_node == "start"
+        task_types = {t.name: t.task_type for t in result.tasks}
+        assert task_types == {"start": "start", "end": "end"}
 
     def test_from_dict_with_unresolved_refs(self) -> None:
         """Test from_dict gracefully handles unresolved references."""
@@ -3505,7 +3524,19 @@ class TestFlowConverter:
         result = converter.to_dict(workflow)
         assert result["component_type"] == "Flow"
         assert result["name"] == "test_flow"
+        assert result["description"] == "Test flow"
+        # Verify referenced components contain all nodes
         assert "$referenced_components" in result
+        refs = result["$referenced_components"]
+        assert len(refs) == 3
+        ref_types = {v["component_type"] for v in refs.values()}
+        assert "StartNode" in ref_types
+        assert "LlmNode" in ref_types
+        assert "EndNode" in ref_types
+        # Verify control flow edges
+        assert len(result["control_flow_connections"]) == 2
+        # Verify start_node reference exists and points to a valid ref
+        assert "$component_ref" in result["start_node"]
 
     def test_to_dict_with_data_mappings(self) -> None:
         """Test to_dict includes data flow edges from mappings."""
