@@ -4,13 +4,18 @@ import inspect
 from collections.abc import Callable
 from typing import Any, get_type_hints
 
-from pyagentspec.tools import RemoteTool, ServerTool, Tool
+from pyagentspec.tools import BuiltinTool, ClientTool, RemoteTool, ServerTool, Tool, ToolBox
 
 # MCPTool may not be available in all versions
 try:
     from pyagentspec.tools import MCPTool  # type: ignore[attr-defined]
 except ImportError:
     MCPTool = None
+
+try:
+    from pyagentspec.mcp.tools import MCPToolBox
+except ImportError:  # pragma: no cover
+    MCPToolBox = None
 
 from dapr_agents_oas_adapter.converters.base import ComponentConverter
 from dapr_agents_oas_adapter.exceptions import ConversionError
@@ -27,8 +32,9 @@ from dapr_agents_oas_adapter.utils import build_json_schema_property, generate_i
 class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
     """Converter for OAS Tool <-> Dapr tool definition.
 
-    Supports conversion between OAS Tool types (ServerTool, RemoteTool, MCPTool)
-    and Dapr Agents tool definitions.
+    Supports conversion between OAS Tool types (ServerTool, RemoteTool,
+    MCPTool, BuiltinTool, ClientTool) and Dapr Agents tool definitions.
+    ToolBox/MCPToolBox containers are flattened into individual entries.
     """
 
     def __init__(self, tool_registry: ToolRegistry | None = None) -> None:
@@ -60,9 +66,17 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         inputs = self._extract_properties(getattr(component, "inputs", []))
         outputs = self._extract_properties(getattr(component, "outputs", []))
 
+        # Determine tool_type from OAS class
+        tool_type = "function"
+        if isinstance(component, BuiltinTool):
+            tool_type = "builtin"
+        elif isinstance(component, ClientTool):
+            tool_type = "client"
+
         return ToolDefinition(
             name=component.name,
             description=component.description or "",
+            tool_type=tool_type,
             inputs=inputs,
             outputs=outputs,
             implementation=implementation,
@@ -75,10 +89,23 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
             component: The Dapr ToolDefinition to convert
 
         Returns:
-            OAS ServerTool with equivalent settings
+            OAS Tool (ServerTool, BuiltinTool, or ClientTool depending on tool_type)
         """
         tool_id = generate_id("tool")
 
+        if component.tool_type == "builtin":
+            return BuiltinTool(
+                id=tool_id,
+                name=component.name,
+                description=component.description,
+                tool_type=component.name,
+            )
+        if component.tool_type == "client":
+            return ClientTool(
+                id=tool_id,
+                name=component.name,
+                description=component.description,
+            )
         return ServerTool(
             id=tool_id,
             name=component.name,
@@ -94,16 +121,26 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         Returns:
             True if this converter can handle the component
         """
-        tool_types = [Tool, ServerTool, RemoteTool]
+        tool_types: list[type] = [Tool, ServerTool, RemoteTool, BuiltinTool, ClientTool, ToolBox]
         if MCPTool is not None:  # pragma: no cover
             tool_types.append(MCPTool)
+        if MCPToolBox is not None:  # pragma: no cover
+            tool_types.append(MCPToolBox)
         if isinstance(component, tuple(tool_types)):
             return True
         if isinstance(component, ToolDefinition):
             return True
         if isinstance(component, dict):
             comp_type = component.get("component_type", "")
-            return comp_type in ("ServerTool", "RemoteTool", "MCPTool")
+            return comp_type in (
+                "ServerTool",
+                "RemoteTool",
+                "MCPTool",
+                "BuiltinTool",
+                "ClientTool",
+                "ToolBox",
+                "MCPToolBox",
+            )
         return False
 
     def from_callable(self, func: Callable[..., Any], name: str | None = None) -> ToolDefinition:
@@ -157,18 +194,27 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
         """
         name = tool_dict.get("name", "")
         implementation = self._tool_registry.get(name)
+        comp_type = tool_dict.get("component_type", "ServerTool")
+
+        # Determine tool_type from component_type
+        tool_type = "function"
+        if comp_type == "BuiltinTool":
+            tool_type = "builtin"
+        elif comp_type == "ClientTool":
+            tool_type = "client"
 
         # Extract MCP transport config if this is an MCPTool
         # Always set transport_config for MCPTool to preserve component type,
         # even if client_transport is empty
         transport_config = None
-        if tool_dict.get("component_type") == "MCPTool":
+        if comp_type == "MCPTool":
             client_transport = tool_dict.get("client_transport", {})
             transport_config = self._parse_transport_dict(client_transport)
 
         return ToolDefinition(
             name=name,
             description=tool_dict.get("description", ""),
+            tool_type=tool_type,
             inputs=tool_dict.get("inputs", []),
             outputs=tool_dict.get("outputs", []),
             implementation=implementation,
@@ -201,8 +247,12 @@ class ToolConverter(ComponentConverter[Tool, ToolDefinition]):
                 "client_transport": client_transport,
             }
 
+        # Map tool_type to OAS component_type
+        type_map = {"builtin": "BuiltinTool", "client": "ClientTool"}
+        oas_comp_type = type_map.get(tool_def.tool_type, "ServerTool")
+
         return {
-            "component_type": "ServerTool",
+            "component_type": oas_comp_type,
             "id": generate_id("tool"),
             "name": tool_def.name,
             "description": tool_def.description,

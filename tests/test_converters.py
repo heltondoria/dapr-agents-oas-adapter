@@ -975,6 +975,151 @@ class TestToolConverter:
         assert "valid" in result
         assert len(result) == 1
 
+    def test_from_oas_builtin_tool(self) -> None:
+        """Test from_oas with BuiltinTool sets tool_type='builtin'."""
+        from pyagentspec.tools import BuiltinTool
+
+        converter = ToolConverter()
+        tool = BuiltinTool(
+            id="bt_1",
+            name="code_interpreter",
+            description="Execute Python code",
+            tool_type="code_interpreter",
+        )
+
+        result = converter.from_oas(tool)
+        assert result.name == "code_interpreter"
+        assert result.tool_type == "builtin"
+        assert result.description == "Execute Python code"
+
+    def test_from_oas_client_tool(self) -> None:
+        """Test from_oas with ClientTool sets tool_type='client'."""
+        from pyagentspec.tools import ClientTool
+
+        converter = ToolConverter()
+        tool = ClientTool(
+            id="ct_1",
+            name="file_picker",
+            description="Pick a file from the user's device",
+        )
+
+        result = converter.from_oas(tool)
+        assert result.name == "file_picker"
+        assert result.tool_type == "client"
+
+    def test_to_oas_builtin_tool(self) -> None:
+        """Test to_oas creates BuiltinTool when tool_type='builtin'."""
+        from pyagentspec.tools import BuiltinTool
+
+        converter = ToolConverter()
+        tool_def = ToolDefinition(
+            name="web_search",
+            description="Search the web",
+            tool_type="builtin",
+        )
+
+        result = converter.to_oas(tool_def)
+        assert isinstance(result, BuiltinTool)
+        assert result.name == "web_search"
+
+    def test_to_oas_client_tool(self) -> None:
+        """Test to_oas creates ClientTool when tool_type='client'."""
+        from pyagentspec.tools import ClientTool
+
+        converter = ToolConverter()
+        tool_def = ToolDefinition(
+            name="file_upload",
+            description="Upload a file",
+            tool_type="client",
+        )
+
+        result = converter.to_oas(tool_def)
+        assert isinstance(result, ClientTool)
+        assert result.name == "file_upload"
+
+    def test_from_dict_builtin_tool(self) -> None:
+        """Test from_dict with BuiltinTool sets tool_type='builtin'."""
+        converter = ToolConverter()
+        tool_dict = {
+            "component_type": "BuiltinTool",
+            "name": "code_exec",
+            "description": "Execute code",
+            "inputs": [],
+            "outputs": [],
+        }
+
+        result = converter.from_dict(tool_dict)
+        assert result.name == "code_exec"
+        assert result.tool_type == "builtin"
+
+    def test_from_dict_client_tool(self) -> None:
+        """Test from_dict with ClientTool sets tool_type='client'."""
+        converter = ToolConverter()
+        tool_dict = {
+            "component_type": "ClientTool",
+            "name": "clipboard",
+            "description": "Access clipboard",
+            "inputs": [],
+            "outputs": [],
+        }
+
+        result = converter.from_dict(tool_dict)
+        assert result.name == "clipboard"
+        assert result.tool_type == "client"
+
+    def test_to_dict_builtin_tool(self) -> None:
+        """Test to_dict emits component_type='BuiltinTool'."""
+        converter = ToolConverter()
+        tool_def = ToolDefinition(
+            name="calculator",
+            description="Calculate expressions",
+            tool_type="builtin",
+        )
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "BuiltinTool"
+        assert result["name"] == "calculator"
+
+    def test_to_dict_client_tool(self) -> None:
+        """Test to_dict emits component_type='ClientTool'."""
+        converter = ToolConverter()
+        tool_def = ToolDefinition(
+            name="camera",
+            description="Access camera",
+            tool_type="client",
+        )
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "ClientTool"
+        assert result["name"] == "camera"
+
+    def test_can_convert_builtin_client_tool(self) -> None:
+        """Test can_convert recognizes BuiltinTool/ClientTool dicts."""
+        converter = ToolConverter()
+        assert converter.can_convert({"component_type": "BuiltinTool"}) is True
+        assert converter.can_convert({"component_type": "ClientTool"}) is True
+        assert converter.can_convert({"component_type": "ToolBox"}) is True
+        assert converter.can_convert({"component_type": "MCPToolBox"}) is True
+
+    def test_roundtrip_builtin_tool(self) -> None:
+        """Test from_dict → to_dict round-trip preserves BuiltinTool type."""
+        converter = ToolConverter()
+        original = {
+            "component_type": "BuiltinTool",
+            "name": "search",
+            "description": "Search",
+            "inputs": [{"title": "query", "type": "string"}],
+            "outputs": [],
+        }
+
+        tool_def = converter.from_dict(original)
+        assert tool_def.tool_type == "builtin"
+
+        result = converter.to_dict(tool_def)
+        assert result["component_type"] == "BuiltinTool"
+        assert result["name"] == "search"
+        assert result["inputs"] == [{"title": "query", "type": "string"}]
+
 
 class TestMCPToolConverter:
     """Tests for MCPToolConverter."""
