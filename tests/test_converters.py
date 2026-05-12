@@ -4565,6 +4565,406 @@ class TestFlowConverterEdgeCases:
         assert result2.edges == []
 
 
+class TestNewNodeTypes:
+    """Tests for new pyagentspec 26.1.0 node types."""
+
+    def test_from_dict_branching_node(self) -> None:
+        """Test from_dict for BranchingNode preserves mapping."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "BranchingNode",
+                "name": "route",
+                "mapping": {"urgent": "handle_urgent", "normal": "handle_normal"},
+                "inputs": [{"title": "input", "type": "string"}],
+                "outputs": [],
+            }
+        )
+        assert result.task_type == "branch"
+        assert result.name == "route"
+        assert result.config["mapping"] == {"urgent": "handle_urgent", "normal": "handle_normal"}
+        assert result.inputs == ["input"]
+
+    def test_to_dict_branching_node(self) -> None:
+        """Test to_dict for branch task emits BranchingNode with mapping."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="router",
+                task_type="branch",
+                config={"mapping": {"a": "b"}},
+            )
+        )
+        assert result["component_type"] == "BranchingNode"
+        assert result["name"] == "router"
+        assert result["mapping"] == {"a": "b"}
+
+    def test_from_dict_api_node(self) -> None:
+        """Test from_dict for ApiNode preserves url, method, headers."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "ApiNode",
+                "name": "call_api",
+                "url": "https://api.example.com/data",
+                "http_method": "POST",
+                "headers": {"Authorization": "Bearer token"},
+                "data": {"key": "value"},
+                "inputs": [],
+                "outputs": [{"title": "response", "type": "object"}],
+            }
+        )
+        assert result.task_type == "api"
+        assert result.config["url"] == "https://api.example.com/data"
+        assert result.config["http_method"] == "POST"
+        assert result.config["headers"] == {"Authorization": "Bearer token"}
+        assert result.config["data"] == {"key": "value"}
+        assert result.outputs == ["response"]
+
+    def test_to_dict_api_node(self) -> None:
+        """Test to_dict for api task emits ApiNode with url and method."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="fetch",
+                task_type="api",
+                config={"url": "https://api.example.com", "http_method": "GET"},
+            )
+        )
+        assert result["component_type"] == "ApiNode"
+        assert result["url"] == "https://api.example.com"
+        assert result["http_method"] == "GET"
+
+    def test_from_dict_parallel_flow_node(self) -> None:
+        """Test from_dict for ParallelFlowNode preserves subflows."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "ParallelFlowNode",
+                "name": "parallel",
+                "subflows": [{"$component_ref": "flow_a"}, {"$component_ref": "flow_b"}],
+                "inputs": [],
+                "outputs": [],
+            }
+        )
+        assert result.task_type == "parallel_flow"
+        assert len(result.config["subflows"]) == 2
+
+    def test_to_dict_parallel_flow_node(self) -> None:
+        """Test to_dict for parallel_flow task emits ParallelFlowNode."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="par_flow",
+                task_type="parallel_flow",
+                config={"subflows": ["flow_a", "flow_b"]},
+            )
+        )
+        assert result["component_type"] == "ParallelFlowNode"
+        assert result["subflows"] == ["flow_a", "flow_b"]
+
+    def test_from_dict_parallel_map_node(self) -> None:
+        """Test from_dict for ParallelMapNode preserves subflow and reducers."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "ParallelMapNode",
+                "name": "map_reduce",
+                "subflow": {"$component_ref": "process_item"},
+                "reducers": [{"type": "concat"}],
+                "inputs": [{"title": "items", "type": "array"}],
+                "outputs": [{"title": "results", "type": "array"}],
+            }
+        )
+        assert result.task_type == "parallel_map"
+        assert result.config["subflow"] == {"$component_ref": "process_item"}
+        assert result.config["reducers"] == [{"type": "concat"}]
+        assert result.inputs == ["items"]
+
+    def test_to_dict_parallel_map_node(self) -> None:
+        """Test to_dict for parallel_map task emits ParallelMapNode."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="par_map",
+                task_type="parallel_map",
+                config={"subflow": "process", "reducers": [{"type": "sum"}]},
+            )
+        )
+        assert result["component_type"] == "ParallelMapNode"
+        assert result["subflow"] == "process"
+        assert result["reducers"] == [{"type": "sum"}]
+
+    def test_from_dict_input_message_node(self) -> None:
+        """Test from_dict for InputMessageNode preserves message."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "InputMessageNode",
+                "name": "receive",
+                "message": {"topic": "requests", "schema": {"type": "object"}},
+                "inputs": [],
+                "outputs": [{"title": "payload", "type": "object"}],
+            }
+        )
+        assert result.task_type == "input_message"
+        assert result.config["message"]["topic"] == "requests"
+
+    def test_from_dict_output_message_node(self) -> None:
+        """Test from_dict for OutputMessageNode preserves message."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "OutputMessageNode",
+                "name": "send",
+                "message": {"topic": "responses"},
+                "inputs": [{"title": "result", "type": "string"}],
+                "outputs": [],
+            }
+        )
+        assert result.task_type == "output_message"
+        assert result.config["message"]["topic"] == "responses"
+
+    def test_to_dict_input_message_node(self) -> None:
+        """Test to_dict for input_message task."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="msg_in",
+                task_type="input_message",
+                config={"message": {"topic": "input"}},
+            )
+        )
+        assert result["component_type"] == "InputMessageNode"
+        assert result["message"] == {"topic": "input"}
+
+    def test_to_dict_output_message_node(self) -> None:
+        """Test to_dict for output_message task."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(
+                name="msg_out",
+                task_type="output_message",
+                config={"message": {"topic": "output"}},
+            )
+        )
+        assert result["component_type"] == "OutputMessageNode"
+        assert result["message"] == {"topic": "output"}
+
+    def test_can_convert_new_node_types(self) -> None:
+        """Test can_convert recognizes all new node type dicts."""
+        converter = NodeConverter()
+        for node_type in (
+            "BranchingNode",
+            "ApiNode",
+            "ParallelFlowNode",
+            "ParallelMapNode",
+            "InputMessageNode",
+            "OutputMessageNode",
+        ):
+            assert converter.can_convert({"component_type": node_type}) is True
+
+    def test_extract_node_config_branching(self) -> None:
+        """Test _extract_node_config for BranchingNode."""
+        from dapr_agents_oas_adapter.converters.node import BranchingNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = BranchingNode
+        mock_node.mapping = {"yes": "approve", "no": "reject"}
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert config["mapping"] == {"yes": "approve", "no": "reject"}
+
+    def test_extract_node_config_api(self) -> None:
+        """Test _extract_node_config for ApiNode."""
+        from dapr_agents_oas_adapter.converters.node import ApiNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = ApiNode
+        mock_node.url = "https://api.test.com"
+        mock_node.http_method = "POST"
+        mock_node.api_spec_uri = None
+        mock_node.data = None
+        mock_node.query_params = None
+        mock_node.headers = {"X-Key": "val"}
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert config["url"] == "https://api.test.com"
+        assert config["http_method"] == "POST"
+        assert config["headers"] == {"X-Key": "val"}
+        assert "data" not in config  # None values excluded
+
+    def test_extract_node_config_parallel_flow(self) -> None:
+        """Test _extract_node_config for ParallelFlowNode."""
+        from dapr_agents_oas_adapter.converters.node import ParallelFlowNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = ParallelFlowNode
+        mock_node.subflows = ["flow_a", "flow_b"]
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert config["subflows"] == ["flow_a", "flow_b"]
+
+    def test_extract_node_config_parallel_map(self) -> None:
+        """Test _extract_node_config for ParallelMapNode."""
+        from dapr_agents_oas_adapter.converters.node import ParallelMapNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = ParallelMapNode
+        mock_node.subflow = "process_item"
+        mock_node.reducers = [{"type": "concat"}]
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert config["subflow"] == "process_item"
+        assert config["reducers"] == [{"type": "concat"}]
+
+    def test_extract_node_config_input_message(self) -> None:
+        """Test _extract_node_config for InputMessageNode."""
+        from dapr_agents_oas_adapter.converters.node import InputMessageNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = InputMessageNode
+        mock_node.message = {"topic": "events"}
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert config["message"] == {"topic": "events"}
+
+    def test_from_dict_api_node_minimal(self) -> None:
+        """Test from_dict for ApiNode with only required fields."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {"component_type": "ApiNode", "name": "minimal_api", "inputs": [], "outputs": []}
+        )
+        assert result.task_type == "api"
+        assert "url" not in result.config
+
+    def test_from_dict_parallel_map_node_minimal(self) -> None:
+        """Test from_dict for ParallelMapNode with no subflow/reducers."""
+        converter = NodeConverter()
+        result = converter.from_dict(
+            {
+                "component_type": "ParallelMapNode",
+                "name": "minimal_map",
+                "inputs": [],
+                "outputs": [],
+            }
+        )
+        assert result.task_type == "parallel_map"
+        assert "subflow" not in result.config
+        assert "reducers" not in result.config
+
+    def test_to_dict_branch_no_mapping(self) -> None:
+        """Test to_dict for branch task without mapping."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(name="empty_branch", task_type="branch", config={})
+        )
+        assert result["component_type"] == "BranchingNode"
+        assert "mapping" not in result
+
+    def test_to_dict_parallel_flow_no_config(self) -> None:
+        """Test to_dict for parallel_flow without subflows."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(name="empty_pflow", task_type="parallel_flow", config={})
+        )
+        assert result["component_type"] == "ParallelFlowNode"
+        assert "subflows" not in result
+
+    def test_to_dict_parallel_map_no_config(self) -> None:
+        """Test to_dict for parallel_map without subflow/reducers."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(name="empty_pmap", task_type="parallel_map", config={})
+        )
+        assert result["component_type"] == "ParallelMapNode"
+        assert "subflow" not in result
+        assert "reducers" not in result
+
+    def test_to_dict_message_no_config(self) -> None:
+        """Test to_dict for message nodes without message in config."""
+        converter = NodeConverter()
+        result = converter.to_dict(
+            WorkflowTaskDefinition(name="empty_msg", task_type="input_message", config={})
+        )
+        assert result["component_type"] == "InputMessageNode"
+        assert "message" not in result
+
+    def test_extract_node_config_parallel_flow_none(self) -> None:
+        """Test _extract_node_config for ParallelFlowNode with no subflows."""
+        from dapr_agents_oas_adapter.converters.node import ParallelFlowNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = ParallelFlowNode
+        mock_node.subflows = None
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert "subflows" not in config
+
+    def test_extract_node_config_parallel_map_none(self) -> None:
+        """Test _extract_node_config for ParallelMapNode with None subflow/reducers."""
+        from dapr_agents_oas_adapter.converters.node import ParallelMapNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = ParallelMapNode
+        mock_node.subflow = None
+        mock_node.reducers = None
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert "subflow" not in config
+        assert "reducers" not in config
+
+    def test_extract_node_config_branching_none(self) -> None:
+        """Test _extract_node_config for BranchingNode with None mapping."""
+        from dapr_agents_oas_adapter.converters.node import BranchingNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = BranchingNode
+        mock_node.mapping = None
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert "mapping" not in config
+
+    def test_extract_node_config_message_none(self) -> None:
+        """Test _extract_node_config for message node with None message."""
+        from dapr_agents_oas_adapter.converters.node import OutputMessageNode
+
+        converter = NodeConverter()
+        mock_node = MagicMock()
+        mock_node.__class__ = OutputMessageNode
+        mock_node.message = None
+        mock_node.metadata = None
+        config = converter._extract_node_config(mock_node)
+        assert "message" not in config
+
+    def test_roundtrip_api_node(self) -> None:
+        """Test from_dict → to_dict round-trip for ApiNode."""
+        converter = NodeConverter()
+        original = {
+            "component_type": "ApiNode",
+            "name": "api_call",
+            "url": "https://api.example.com/v1/data",
+            "http_method": "POST",
+            "headers": {"Content-Type": "application/json"},
+            "inputs": [{"title": "body", "type": "object"}],
+            "outputs": [{"title": "response", "type": "object"}],
+        }
+        task_def = converter.from_dict(original)
+        result = converter.to_dict(task_def)
+        assert result["component_type"] == "ApiNode"
+        assert result["url"] == "https://api.example.com/v1/data"
+        assert result["http_method"] == "POST"
+        assert result["headers"] == {"Content-Type": "application/json"}
+
+
 class TestNodeConverterEdgeCases:
     """Additional edge case tests for NodeConverter."""
 
