@@ -8,10 +8,16 @@ from pyagentspec import Property
 from pyagentspec.flows.node import Node
 from pyagentspec.flows.nodes import (
     AgentNode,
+    ApiNode,
+    BranchingNode,
     EndNode,
     FlowNode,
+    InputMessageNode,
     LlmNode,
     MapNode,
+    OutputMessageNode,
+    ParallelFlowNode,
+    ParallelMapNode,
     StartNode,
     ToolNode,
 )
@@ -162,6 +168,12 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 "AgentNode",
                 "FlowNode",
                 "MapNode",
+                "BranchingNode",
+                "ApiNode",
+                "ParallelFlowNode",
+                "ParallelMapNode",
+                "InputMessageNode",
+                "OutputMessageNode",
             )
         return False
 
@@ -201,6 +213,26 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
                 config["map_input_key"] = node_dict.get("map_input_key")
             if "map_item_key" in node_dict:
                 config["map_item_key"] = node_dict.get("map_item_key")
+
+        if node_type == "BranchingNode" and "mapping" in node_dict:
+            config["mapping"] = node_dict["mapping"]
+
+        if node_type == "ApiNode":
+            for key in ("url", "http_method", "api_spec_uri", "data", "query_params", "headers"):
+                if key in node_dict:
+                    config[key] = node_dict[key]
+
+        if node_type == "ParallelFlowNode" and "subflows" in node_dict:
+            config["subflows"] = node_dict["subflows"]
+
+        if node_type == "ParallelMapNode":
+            if "subflow" in node_dict:
+                config["subflow"] = node_dict["subflow"]
+            if "reducers" in node_dict:
+                config["reducers"] = node_dict["reducers"]
+
+        if node_type in ("InputMessageNode", "OutputMessageNode") and "message" in node_dict:
+            config["message"] = node_dict["message"]
 
         metadata = node_dict.get("metadata") or {}
         self._merge_runtime_metadata(config, metadata)
@@ -244,6 +276,24 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             )
             if inner_flow_id:
                 result["subflow"] = {"$component_ref": inner_flow_id}
+        elif task_def.task_type == "branch":
+            if "mapping" in task_def.config:
+                result["mapping"] = task_def.config["mapping"]
+        elif task_def.task_type == "api":
+            for key in ("url", "http_method", "api_spec_uri", "data", "query_params", "headers"):
+                if key in task_def.config:
+                    result[key] = task_def.config[key]
+        elif task_def.task_type == "parallel_flow":
+            if "subflows" in task_def.config:
+                result["subflows"] = task_def.config["subflows"]
+        elif task_def.task_type == "parallel_map":
+            if "subflow" in task_def.config:
+                result["subflow"] = task_def.config["subflow"]
+            if "reducers" in task_def.config:
+                result["reducers"] = task_def.config["reducers"]
+        elif task_def.task_type in ("input_message", "output_message"):
+            if "message" in task_def.config:
+                result["message"] = task_def.config["message"]
 
         runtime_metadata = {}
         for key in (
@@ -297,6 +347,12 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             "AgentNode": "agent",
             "FlowNode": "flow",
             "MapNode": "map",
+            "BranchingNode": "branch",
+            "ApiNode": "api",
+            "ParallelFlowNode": "parallel_flow",
+            "ParallelMapNode": "parallel_map",
+            "InputMessageNode": "input_message",
+            "OutputMessageNode": "output_message",
         }
         return mapping.get(node_type, "llm")
 
@@ -310,6 +366,12 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             "agent": "AgentNode",
             "flow": "FlowNode",
             "map": "MapNode",
+            "branch": "BranchingNode",
+            "api": "ApiNode",
+            "parallel_flow": "ParallelFlowNode",
+            "parallel_map": "ParallelMapNode",
+            "input_message": "InputMessageNode",
+            "output_message": "OutputMessageNode",
         }
         return mapping.get(task_type, "LlmNode")
 
@@ -323,6 +385,12 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             "agent": AgentNode,
             "flow": FlowNode,
             "map": MapNode,
+            "branch": BranchingNode,
+            "api": ApiNode,
+            "parallel_flow": ParallelFlowNode,
+            "parallel_map": ParallelMapNode,
+            "input_message": InputMessageNode,
+            "output_message": OutputMessageNode,
         }
         return mapping.get(task_type, LlmNode)
 
@@ -362,6 +430,35 @@ class NodeConverter(ComponentConverter[Node, WorkflowTaskDefinition]):
             )
             if inner_flow:  # pragma: no branch
                 config["inner_flow_id"] = getattr(inner_flow, "id", "")
+
+        elif isinstance(node, BranchingNode):
+            mapping = getattr(node, "mapping", None)
+            if mapping is not None:
+                config["mapping"] = mapping
+
+        elif isinstance(node, ApiNode):
+            for key in ("url", "http_method", "api_spec_uri", "data", "query_params", "headers"):
+                val = getattr(node, key, None)
+                if val is not None:
+                    config[key] = val
+
+        elif isinstance(node, ParallelFlowNode):
+            subflows = getattr(node, "subflows", None)
+            if subflows is not None:
+                config["subflows"] = subflows
+
+        elif isinstance(node, ParallelMapNode):
+            subflow = getattr(node, "subflow", None)
+            if subflow is not None:
+                config["subflow"] = subflow
+            reducers = getattr(node, "reducers", None)
+            if reducers is not None:
+                config["reducers"] = reducers
+
+        elif isinstance(node, (InputMessageNode, OutputMessageNode)):
+            message = getattr(node, "message", None)
+            if message is not None:
+                config["message"] = message
 
         metadata = getattr(node, "metadata", None) or {}
         self._merge_runtime_metadata(config, metadata)
