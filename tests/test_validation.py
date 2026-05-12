@@ -135,7 +135,7 @@ class TestWorkflowValidator:
     """Tests for WorkflowValidator class."""
 
     def test_validate_valid_workflow(self) -> None:
-        """Test validation of a valid workflow."""
+        """Test validation of a valid workflow produces zero issues."""
         workflow = WorkflowDefinition(
             name="test_workflow",
             tasks=[
@@ -153,9 +153,11 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is True
+        assert len(result.errors) == 0
+        assert len(result.warnings) == 0
 
     def test_validate_missing_name(self) -> None:
-        """Test validation catches missing workflow name."""
+        """Test validation catches missing workflow name with field and suggestion."""
         workflow = WorkflowDefinition(
             name="",  # Empty name
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -163,18 +165,23 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("name" in str(e).lower() for e in result.errors)
+        name_errors = [e for e in result.errors if e.field == "name"]
+        assert len(name_errors) == 1
+        assert "required" in name_errors[0].message.lower()
+        assert name_errors[0].suggestion is not None
 
     def test_validate_empty_tasks_warning(self) -> None:
-        """Test validation warns about empty tasks."""
+        """Test validation warns about empty tasks with correct field."""
         workflow = WorkflowDefinition(name="empty_workflow", tasks=[])
         validator = WorkflowValidator()
         result = validator.validate(workflow)
-        # Empty tasks is a warning, not error
-        assert any("no tasks" in str(w).lower() for w in result.warnings)
+        task_warnings = [w for w in result.warnings if w.field == "tasks"]
+        assert len(task_warnings) == 1
+        assert "no tasks" in task_warnings[0].message.lower()
+        assert task_warnings[0].suggestion is not None
 
     def test_validate_duplicate_task_names(self) -> None:
-        """Test validation catches duplicate task names."""
+        """Test validation catches duplicate task names with field path."""
         workflow = WorkflowDefinition(
             name="dup_workflow",
             tasks=[
@@ -185,10 +192,13 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("duplicate" in str(e).lower() for e in result.errors)
+        dup_errors = [e for e in result.errors if "duplicate" in e.message.lower()]
+        assert len(dup_errors) == 1
+        assert dup_errors[0].field == "tasks[1].name"
+        assert "same_name" in dup_errors[0].message
 
     def test_validate_task_missing_name(self) -> None:
-        """Test validation catches task missing name."""
+        """Test validation catches task missing name with indexed field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="", task_type="llm")],
@@ -196,10 +206,13 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("task name" in str(e).lower() for e in result.errors)
+        name_errors = [e for e in result.errors if "task name" in e.message.lower()]
+        assert len(name_errors) == 1
+        assert name_errors[0].field == "tasks[0].name"
+        assert name_errors[0].suggestion is not None
 
     def test_validate_task_missing_type(self) -> None:
-        """Test validation catches task missing type."""
+        """Test validation catches task missing type with indexed field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="")],
@@ -207,40 +220,52 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("task type" in str(e).lower() for e in result.errors)
+        type_errors = [e for e in result.errors if "task type" in e.message.lower()]
+        assert len(type_errors) == 1
+        assert type_errors[0].field == "tasks[0].task_type"
+        assert type_errors[0].suggestion is not None
 
     def test_validate_unknown_task_type_warning(self) -> None:
-        """Test validation warns about unknown task type."""
+        """Test validation warns about unknown task type with field and valid types."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="unknown_type")],
         )
         validator = WorkflowValidator()
         result = validator.validate(workflow)
-        assert any("unknown task type" in str(w).lower() for w in result.warnings)
+        type_warnings = [w for w in result.warnings if "unknown task type" in w.message.lower()]
+        assert len(type_warnings) == 1
+        assert type_warnings[0].field == "tasks[0].task_type"
+        assert "unknown_type" in type_warnings[0].message
+        assert type_warnings[0].suggestion is not None
+        assert "llm" in type_warnings[0].suggestion
 
     def test_validate_tool_task_missing_tool_name(self) -> None:
-        """Test validation warns when tool task missing tool_name."""
+        """Test validation warns when tool task missing tool_name with correct field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="tool_task", task_type="tool", config={})],
         )
         validator = WorkflowValidator()
         result = validator.validate(workflow)
-        assert any("tool_name" in str(w).lower() for w in result.warnings)
+        tool_warnings = [w for w in result.warnings if "tool_name" in w.message.lower()]
+        assert len(tool_warnings) == 1
+        assert tool_warnings[0].field == "tasks[0].config.tool_name"
 
     def test_validate_flow_task_missing_flow_id(self) -> None:
-        """Test validation warns when flow task missing flow_id."""
+        """Test validation warns when flow task missing flow_id with correct field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="flow_task", task_type="flow", config={})],
         )
         validator = WorkflowValidator()
         result = validator.validate(workflow)
-        assert any("flow_id" in str(w).lower() for w in result.warnings)
+        flow_warnings = [w for w in result.warnings if "flow_id" in w.message.lower()]
+        assert len(flow_warnings) == 1
+        assert flow_warnings[0].field == "tasks[0].config.flow_id"
 
     def test_validate_edge_missing_from_node(self) -> None:
-        """Test validation catches edge missing from_node."""
+        """Test validation catches edge missing from_node with field and suggestion."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -249,10 +274,13 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("from_node" in str(e).lower() for e in result.errors)
+        from_errors = [e for e in result.errors if "from_node" in e.message.lower()]
+        assert len(from_errors) == 1
+        assert from_errors[0].field == "edges[0].from_node"
+        assert from_errors[0].suggestion is not None
 
     def test_validate_edge_missing_to_node(self) -> None:
-        """Test validation catches edge missing to_node."""
+        """Test validation catches edge missing to_node with field and suggestion."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -261,10 +289,13 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("to_node" in str(e).lower() for e in result.errors)
+        to_errors = [e for e in result.errors if "to_node" in e.message.lower()]
+        assert len(to_errors) == 1
+        assert to_errors[0].field == "edges[0].to_node"
+        assert to_errors[0].suggestion is not None
 
     def test_validate_self_referencing_edge(self) -> None:
-        """Test validation catches self-referencing edge."""
+        """Test validation catches self-referencing edge with node names."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -273,10 +304,14 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("self-referencing" in str(e).lower() for e in result.errors)
+        self_errors = [e for e in result.errors if "self-referencing" in e.message.lower()]
+        assert len(self_errors) == 1
+        assert "task1" in self_errors[0].message
+        assert self_errors[0].field == "edges[0]"
+        assert self_errors[0].suggestion is not None
 
     def test_validate_invalid_start_node_reference(self) -> None:
-        """Test validation catches invalid start_node reference."""
+        """Test validation catches invalid start_node reference with field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -285,10 +320,14 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("start node" in str(e).lower() for e in result.errors)
+        start_errors = [e for e in result.errors if e.field == "start_node"]
+        assert len(start_errors) == 1
+        assert "nonexistent" in start_errors[0].message
+        assert start_errors[0].suggestion is not None
+        assert "task1" in start_errors[0].suggestion
 
     def test_validate_invalid_end_node_reference(self) -> None:
-        """Test validation catches invalid end_nodes reference."""
+        """Test validation catches invalid end_nodes reference with field."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -297,10 +336,13 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("end node" in str(e).lower() for e in result.errors)
+        end_errors = [e for e in result.errors if e.field == "end_nodes[0]"]
+        assert len(end_errors) == 1
+        assert "nonexistent" in end_errors[0].message
+        assert end_errors[0].suggestion is not None
 
     def test_validate_edge_references_unknown_from_node(self) -> None:
-        """Test validation catches edge referencing unknown from_node."""
+        """Test validation catches edge referencing unknown from_node with details."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -309,10 +351,15 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("unknown source node" in str(e).lower() for e in result.errors)
+        ref_errors = [e for e in result.errors if "unknown source" in e.message.lower()]
+        assert len(ref_errors) == 1
+        assert ref_errors[0].field == "edges[0].from_node"
+        assert "unknown" in ref_errors[0].message
+        assert ref_errors[0].suggestion is not None
+        assert "task1" in ref_errors[0].suggestion
 
     def test_validate_edge_references_unknown_to_node(self) -> None:
-        """Test validation catches edge referencing unknown to_node."""
+        """Test validation catches edge referencing unknown to_node with details."""
         workflow = WorkflowDefinition(
             name="workflow",
             tasks=[WorkflowTaskDefinition(name="task1", task_type="llm")],
@@ -321,7 +368,11 @@ class TestWorkflowValidator:
         validator = WorkflowValidator()
         result = validator.validate(workflow)
         assert result.is_valid is False
-        assert any("unknown target node" in str(e).lower() for e in result.errors)
+        ref_errors = [e for e in result.errors if "unknown target" in e.message.lower()]
+        assert len(ref_errors) == 1
+        assert ref_errors[0].field == "edges[0].to_node"
+        assert "unknown" in ref_errors[0].message
+        assert ref_errors[0].suggestion is not None
 
     def test_validate_orphan_task_warning(self) -> None:
         """Test validation warns about orphan tasks."""
@@ -506,23 +557,28 @@ class TestOASSchemaValidator:
         assert result.is_valid is True
 
     def test_validate_agent_missing_name(self) -> None:
-        """Test validation catches missing agent name."""
+        """Test validation catches missing agent name with field path."""
         validator = OASSchemaValidator()
         data = {"component_type": "Agent", "description": "No name"}
         result = validator.validate_agent(data)
         assert result.is_valid is False
-        assert any("name" in str(e).lower() for e in result.errors)
+        name_errors = [e for e in result.errors if e.field == "name"]
+        assert len(name_errors) == 1
+        assert "required" in name_errors[0].message.lower()
+        assert name_errors[0].suggestion is not None
 
     def test_validate_agent_empty_name(self) -> None:
-        """Test validation catches empty agent name."""
+        """Test validation catches empty agent name with field path."""
         validator = OASSchemaValidator()
         data = {"component_type": "Agent", "name": ""}
         result = validator.validate_agent(data)
         assert result.is_valid is False
-        assert any("name" in str(e).lower() for e in result.errors)
+        name_errors = [e for e in result.errors if e.field == "name"]
+        assert len(name_errors) == 1
+        assert name_errors[0].suggestion is not None
 
     def test_validate_agent_unknown_fields_warning(self) -> None:
-        """Test validation warns about unknown fields in agent."""
+        """Test validation warns about unknown fields with field name."""
         validator = OASSchemaValidator()
         data = {
             "component_type": "Agent",
@@ -531,7 +587,9 @@ class TestOASSchemaValidator:
         }
         result = validator.validate_agent(data)
         assert result.is_valid is True  # Valid, just warns
-        assert any("unknown field" in str(w).lower() for w in result.warnings)
+        unknown_warnings = [w for w in result.warnings if "unknown field" in w.message.lower()]
+        assert len(unknown_warnings) >= 1
+        assert "unknown_field" in unknown_warnings[0].message
 
     def test_validate_agent_with_tools(self) -> None:
         """Test validation of agent with tools."""
@@ -545,7 +603,7 @@ class TestOASSchemaValidator:
         assert result.is_valid is True
 
     def test_validate_agent_invalid_tools_format(self) -> None:
-        """Test validation catches invalid tools format."""
+        """Test validation catches invalid tools format with field."""
         validator = OASSchemaValidator()
         data = {
             "component_type": "Agent",
@@ -554,10 +612,13 @@ class TestOASSchemaValidator:
         }
         result = validator.validate_agent(data)
         assert result.is_valid is False
-        assert any("tools must be an array" in str(e).lower() for e in result.errors)
+        tools_errors = [e for e in result.errors if e.field == "tools"]
+        assert len(tools_errors) == 1
+        assert "array" in tools_errors[0].message.lower()
+        assert tools_errors[0].suggestion is not None
 
     def test_validate_agent_tool_missing_name(self) -> None:
-        """Test validation catches tool missing name."""
+        """Test validation catches tool missing name with indexed field."""
         validator = OASSchemaValidator()
         data = {
             "component_type": "Agent",
@@ -566,10 +627,12 @@ class TestOASSchemaValidator:
         }
         result = validator.validate_agent(data)
         assert result.is_valid is False
-        assert any("missing 'name'" in str(e).lower() for e in result.errors)
+        tool_errors = [e for e in result.errors if "tools[0]" in (e.field or "")]
+        assert len(tool_errors) == 1
+        assert "name" in tool_errors[0].message.lower()
 
     def test_validate_agent_invalid_tool_type(self) -> None:
-        """Test validation catches invalid tool type."""
+        """Test validation catches invalid tool type with indexed field."""
         validator = OASSchemaValidator()
         data = {
             "component_type": "Agent",
@@ -578,7 +641,9 @@ class TestOASSchemaValidator:
         }
         result = validator.validate_agent(data)
         assert result.is_valid is False
-        assert any("must be a string or object" in str(e).lower() for e in result.errors)
+        tool_errors = [e for e in result.errors if "tools[0]" in (e.field or "")]
+        assert len(tool_errors) == 1
+        assert "string or object" in tool_errors[0].message.lower()
 
     def test_validate_agent_with_llm_config(self) -> None:
         """Test validation of agent with LLM config."""
@@ -592,7 +657,7 @@ class TestOASSchemaValidator:
         assert result.is_valid is True
 
     def test_validate_agent_invalid_llm_config_format(self) -> None:
-        """Test validation catches invalid llm_config format."""
+        """Test validation catches invalid llm_config format with field."""
         validator = OASSchemaValidator()
         data = {
             "component_type": "Agent",
@@ -601,6 +666,9 @@ class TestOASSchemaValidator:
         }
         result = validator.validate_agent(data)
         assert result.is_valid is False
+        llm_errors = [e for e in result.errors if e.field == "llm_config"]
+        assert len(llm_errors) == 1
+        assert llm_errors[0].suggestion is not None
         assert any("llm_config must be an object" in str(e).lower() for e in result.errors)
 
     def test_validate_agent_unknown_llm_type_warning(self) -> None:
